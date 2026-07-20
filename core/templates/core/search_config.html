@@ -226,8 +226,11 @@
 {% block extra_js %}
 <script>
 // Platform card toggle
+// CRITICAL: must call e.preventDefault() to stop the <label> from also toggling the checkbox
+// (without it, the checkbox toggles TWICE: once by browser label, once by JS -> net zero change)
 document.querySelectorAll('.jf-platform-card').forEach(card => {
-    card.addEventListener('click', function() {
+    card.addEventListener('click', function(e) {
+        e.preventDefault(); // Stop browser's default label-toggle behavior
         const input = this.querySelector('.jf-platform-input');
         input.checked = !input.checked;
         this.classList.toggle('checked', input.checked);
@@ -240,7 +243,8 @@ document.querySelectorAll('.jf-category-card').forEach(card => {
     if (card.dataset.suggested === '1') {
         card.classList.add('suggested');
     }
-    card.addEventListener('click', function() {
+    card.addEventListener('click', function(e) {
+        e.preventDefault(); // Stop browser's default label-toggle behavior
         const input = this.querySelector('.jf-cat-input');
         input.checked = !input.checked;
         this.classList.toggle('checked', input.checked);

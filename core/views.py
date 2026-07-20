@@ -220,7 +220,8 @@ def search_config(request, resume_id):
 def _build_category_keywords(selected_slugs: list) -> str:
     """
     Build search keywords from selected category slugs.
-    Combines skills, positions, and keywords for matching.
+    Returns a SHORT, focused keyword string for the API keyword filter.
+    Category-based filtering is handled separately via categorySlugs.
     """
     if not selected_slugs:
         return ''
@@ -229,17 +230,18 @@ def _build_category_keywords(selected_slugs: list) -> str:
     categories = JobCategory.objects.filter(slug__in=selected_slugs, is_active=True)
 
     for cat in categories:
-        # Add top skills (first 5)
-        for skill in (cat.skills or [])[:5]:
+        # Only add top 3 most specific English skills (avoid generic ones)
+        for skill in (cat.skills or [])[:3]:
             keywords_parts.add(skill)
-        # Add top positions (first 3)
-        for pos in (cat.positions or [])[:3]:
-            keywords_parts.add(pos)
-        # Add English keywords
-        for kw in (cat.keywords_en or []):
-            keywords_parts.add(kw)
+        # Add top 2 positions
+        for pos in (cat.positions or [])[:2]:
+            # Only add English positions (Persian ones confuse the API)
+            if any(c.isascii() for c in pos):
+                keywords_parts.add(pos)
 
-    return ' '.join(keywords_parts)
+    # Limit to max 8 keywords total to keep API query reasonable
+    result = list(keywords_parts)[:8]
+    return ' '.join(result)
 
 
 def _run_search(search: JobSearch, category_keywords: str, auto_keywords: str) -> list:
