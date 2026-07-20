@@ -84,16 +84,28 @@ TESSERACT_CMD = _TESSERACT_PATH
 # Check common Poppler install locations on Windows
 _POPPLER_SEARCH = [
     r'C:\poppler\Library\bin',
+    r'C:\poppler\poppler-26.02.0\Library\bin',
     r'C:\Program Files\poppler\Library\bin',
     r'C:\Program Files (x86)\poppler\Library\bin',
     r'C:\tools\poppler\Library\bin',
     os.path.expandvars(r'%LOCALAPPDATA%\poppler\Library\bin'),
+    # Search for any poppler-xx.x.x version folder
+    r'C:\poppler',
 ]
 POPPLER_PATH = ''
 for _pp in _POPPLER_SEARCH:
     if os.path.isdir(_pp):
-        POPPLER_PATH = _pp
-        break
+        # If it's the base poppler folder, search for Library\bin inside
+        if _pp == r'C:\poppler' and not os.path.isfile(os.path.join(_pp, 'Library', 'bin', 'pdftoppm.exe')):
+            for entry in os.listdir(_pp):
+                candidate = os.path.join(_pp, entry, 'Library', 'bin')
+                if os.path.isdir(candidate):
+                    POPPLER_PATH = candidate
+                    break
+        else:
+            POPPLER_PATH = _pp
+        if POPPLER_PATH:
+            break
 if not POPPLER_PATH:
     _poppler_bin = shutil.which('pdftoppm')
     if _poppler_bin:
