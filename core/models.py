@@ -2,6 +2,78 @@ from django.db import models
 import uuid
 
 
+class JobCategory(models.Model):
+    """Comprehensive job categories database with skill/position mapping."""
+    name = models.CharField(max_length=200, verbose_name='نام حوزه')
+    slug = models.CharField(max_length=100, unique=True, verbose_name='اسلاگ')
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name='children', verbose_name='دسته والد')
+    icon_svg = models.TextField(blank=True, default='', verbose_name='آیکون SVG')
+    color = models.CharField(max_length=7, default='#6366f1', verbose_name='رنگ')
+
+    # Jobvision slug for API filtering
+    jobvision_slug = models.CharField(max_length=100, blank=True, default='')
+    # E-estekhdam slug
+    estekhdam_slug = models.CharField(max_length=100, blank=True, default='')
+    # IranTalent slug
+    irantalent_slug = models.CharField(max_length=100, blank=True, default='')
+
+    # Skills associated with this category
+    skills = models.JSONField(default=list, blank=True, verbose_name='مهارت‌ها')
+    # Common job titles/positions in this category
+    positions = models.JSONField(default=list, blank=True, verbose_name='موقعیت‌های شغلی')
+    # Persian keywords for matching
+    keywords_fa = models.JSONField(default=list, blank=True, verbose_name='کلیدواژه‌های فارسی')
+    # English keywords for matching
+    keywords_en = models.JSONField(default=list, blank=True, verbose_name='کلیدواژه‌های انگلیسی')
+
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'حوزه شغلی'
+        verbose_name_plural = 'حوزه‌های شغلی'
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+    def match_score(self, extracted_skills: list, extracted_text: str = '') -> float:
+        """
+        Calculate how well this category matches extracted resume data.
+        Returns a score between 0 and 1.
+        """
+        if not extracted_skills:
+            return 0.0
+
+        skill_set = set(s.lower() for s in extracted_skills)
+        cat_skills = set(s.lower() for s in self.skills)
+        cat_kw_en = set(k.lower() for k in self.keywords_en)
+        cat_kw_fa = set(k.lower() for k in self.keywords_fa)
+        cat_positions = set(p.lower() for p in self.positions)
+
+        # Skill overlap (most important)
+        skill_overlap = len(skill_set & cat_skills) / max(len(cat_skills), 1)
+
+        # Keyword overlap
+        text_lower = extracted_text.lower() if extracted_text else ''
+        kw_score = 0
+        for kw in cat_kw_en | cat_kw_fa:
+            if kw.lower() in text_lower:
+                kw_score += 1
+        kw_score = min(kw_score / max(len(cat_kw_en | cat_kw_fa), 1), 1.0)
+
+        # Position match in text
+        pos_score = 0
+        for pos in cat_positions:
+            if pos.lower() in text_lower:
+                pos_score += 1
+        pos_score = min(pos_score / max(len(cat_positions), 1), 1.0)
+
+        # Weighted score
+        return round(skill_overlap * 0.5 + kw_score * 0.3 + pos_score * 0.2, 3)
+
+
 class Resume(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.FileField(upload_to='resumes/')
@@ -53,6 +125,7 @@ class JobSearch(models.Model):
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default='all')
     time_range = models.CharField(max_length=10, choices=TIME_RANGE_CHOICES, default='7')
     custom_keywords = models.CharField(max_length=500, blank=True, default='')
+    selected_categories = models.JSONField(default=list, blank=True, verbose_name='حوزه‌های انتخابی')
     status = models.CharField(max_length=20, default='pending')
     error_message = models.TextField(blank=True, default='')
     total_results = models.IntegerField(default=0)

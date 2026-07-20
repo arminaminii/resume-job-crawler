@@ -32,7 +32,7 @@ class SearchConfigForm(forms.Form):
 
     city = forms.ChoiceField(
         label='شهر',
-        widget=forms.Select(attrs={'class': 'form-select'}),
+        widget=forms.Select(attrs={'class': 'form-select modern-select'}),
         choices=[
             ('', 'همه شهرها'),
             ('تهران', 'تهران'),
@@ -42,7 +42,7 @@ class SearchConfigForm(forms.Form):
             ('فارس', 'فارس (شیراز)'),
             ('خوزستان', 'خوزستان (اهواز)'),
             ('گیلان', 'گیلان (رشت)'),
-            ('مازندران', 'مازندران (ساری)'),
+            ('مازندران', 'مازنداران (ساری)'),
             ('آذربایجان شرقی', 'آذربایجان شرقی (تبریز)'),
             ('آذربایجان غربی', 'آذربایجان غربی (ارومیه)'),
             ('کرمان', 'کرمان'),
@@ -64,7 +64,7 @@ class SearchConfigForm(forms.Form):
 
     level = forms.ChoiceField(
         label='سطح کاری',
-        widget=forms.Select(attrs={'class': 'form-select'}),
+        widget=forms.Select(attrs={'class': 'form-select modern-select'}),
         choices=[
             ('all', 'همه سطوح'),
             ('junior', 'جونیور / کارآموز'),
@@ -77,7 +77,7 @@ class SearchConfigForm(forms.Form):
 
     time_range = forms.ChoiceField(
         label='بازه زمانی',
-        widget=forms.Select(attrs={'class': 'form-select'}),
+        widget=forms.Select(attrs={'class': 'form-select modern-select'}),
         choices=[
             ('1', '۱ روز گذشته'),
             ('3', '۳ روز گذشته'),
@@ -92,7 +92,7 @@ class SearchConfigForm(forms.Form):
     custom_keywords = forms.CharField(
         label='کلمات کلیدی اضافی (اختیاری)',
         widget=forms.TextInput(attrs={
-            'class': 'form-control',
+            'class': 'form-control modern-input',
             'placeholder': 'مثال: Python, Django, React',
         }),
         required=False,

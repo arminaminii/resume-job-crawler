@@ -50,7 +50,7 @@ const uploadForm = document.getElementById('uploadForm');
 if (uploadForm) {
     uploadForm.addEventListener('submit', function() {
         document.getElementById('loadingCard').classList.remove('d-none');
-        this.classList.add('d-none');
+        this.closest('.jf-grid-center').style.display = 'none';
     });
 }
 
@@ -58,7 +58,9 @@ if (uploadForm) {
 const searchBtn = document.getElementById('searchBtn');
 if (searchBtn) {
     searchBtn.addEventListener('click', function() {
-        this.disabled = true;
-        this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>در حال جستجو...';
+        if (!this.disabled) {
+            this.disabled = true;
+            this.innerHTML = '<span class="jf-spinner" style="width:18px;height:18px;border-width:2px;display:inline-block;vertical-align:middle;margin-left:8px;"></span> در حال جستجو...';
+        }
     });
 }

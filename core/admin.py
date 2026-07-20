@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import Resume, JobSearch, JobListing
+from .models import Resume, JobSearch, JobListing, JobCategory
+
+
+@admin.register(JobCategory)
+class JobCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'color', 'is_active', 'sort_order')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'slug')
+    list_editable = ('is_active', 'sort_order', 'color')
+    prepopulated_fields = {'slug': ('name',)}
 
 
 @admin.register(Resume)
@@ -13,8 +22,8 @@ class ResumeAdmin(admin.ModelAdmin):
 @admin.register(JobSearch)
 class JobSearchAdmin(admin.ModelAdmin):
     list_display = ('id', 'resume', 'status', 'total_results', 'created_at')
-    list_filter = ('status', 'platforms', 'level', 'time_range')
-    readonly_fields = ('total_results', 'error_message')
+    list_filter = ('status', 'level', 'time_range')
+    readonly_fields = ('total_results', 'error_message', 'selected_categories')
 
 
 @admin.register(JobListing)

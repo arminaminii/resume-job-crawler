@@ -1,9 +1,11 @@
+import json
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.conf import settings
+from django.http import JsonResponse
 
-from .models import Resume, JobSearch, JobListing
+from .models import Resume, JobSearch, JobListing, JobCategory
 from .forms import ResumeUploadForm, SearchConfigForm
 from .services.ocr_service import extract_resume_text
 from .services.bert_classifier import classify_resume, suggest_search_keywords
@@ -110,6 +112,30 @@ def upload_resume(request):
     return redirect('home')
 
 
+def _get_suggested_categories(resume):
+    """
+    Score all JobCategories against resume skills and text.
+    Returns list of (category, score) tuples, sorted by score desc.
+    """
+    if not resume.extracted_skills and not resume.full_text:
+        return []
+
+    categories = JobCategory.objects.filter(is_active=True)
+    scored = []
+
+    for cat in categories:
+        score = cat.match_score(
+            extracted_skills=resume.extracted_skills or [],
+            extracted_text=resume.full_text or '',
+        )
+        if score > 0:
+            scored.append((cat, score))
+
+    # Sort by score descending
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored
+
+
 def search_config(request, resume_id):
     """Configure search parameters for a resume."""
     resume = get_object_or_404(Resume, pk=resume_id)
@@ -123,25 +149,40 @@ def search_config(request, resume_id):
             resume.extracted_fields or [],
         )
 
+    # Smart category suggestions based on OCR/BERT results
+    suggested_categories = _get_suggested_categories(resume)
+    # Pre-select categories with score > 0.1 (significant match)
+    preselected_slugs = [cat.slug for cat, score in suggested_categories if score > 0.1]
+
+    # Get all active categories for the grid
+    all_categories = JobCategory.objects.filter(is_active=True).order_by('sort_order', 'name')
+
     if request.method == 'POST':
         form = SearchConfigForm(request.POST)
         if form.is_valid():
+            # Get selected categories from POST data
+            selected_cats = request.POST.getlist('categories')
+
+            # Build keywords from selected categories + custom input
+            cat_keywords = _build_category_keywords(selected_cats)
+            custom_kw = form.cleaned_data.get('custom_keywords', '')
+
             search = JobSearch.objects.create(
                 resume=resume,
                 platforms=form.cleaned_data['platforms'],
                 city=form.cleaned_data['city'],
                 level=form.cleaned_data['level'],
                 time_range=form.cleaned_data['time_range'],
-                custom_keywords=form.cleaned_data['custom_keywords'],
+                custom_keywords=custom_kw,
+                selected_categories=selected_cats,
                 status='running',
             )
 
-            # Run crawling (could be async with Celery in production)
+            # Run crawling
             try:
-                crawler_messages = _run_search(search, suggested_keywords)
+                crawler_messages = _run_search(search, cat_keywords, suggested_keywords)
                 search.status = 'completed'
 
-                # Show helpful messages about which platforms worked
                 for msg in crawler_messages:
                     if 'error' in msg.lower() or 'not available' in msg.lower():
                         messages.warning(request, msg)
@@ -164,25 +205,53 @@ def search_config(request, resume_id):
 
             return redirect('search_results', search_id=search.id)
     else:
-        form = SearchConfigForm(initial={
-            'custom_keywords': suggested_keywords,
-        })
+        form = SearchConfigForm()
 
     return render(request, 'core/search_config.html', {
         'resume': resume,
         'form': form,
         'suggested_keywords': suggested_keywords,
+        'suggested_categories': suggested_categories,
+        'all_categories': all_categories,
+        'preselected_slugs': preselected_slugs,
     })
 
 
-def _run_search(search: JobSearch, auto_keywords: str) -> list:
+def _build_category_keywords(selected_slugs: list) -> str:
+    """
+    Build search keywords from selected category slugs.
+    Combines skills, positions, and keywords for matching.
+    """
+    if not selected_slugs:
+        return ''
+
+    keywords_parts = set()
+    categories = JobCategory.objects.filter(slug__in=selected_slugs, is_active=True)
+
+    for cat in categories:
+        # Add top skills (first 5)
+        for skill in (cat.skills or [])[:5]:
+            keywords_parts.add(skill)
+        # Add top positions (first 3)
+        for pos in (cat.positions or [])[:3]:
+            keywords_parts.add(pos)
+        # Add English keywords
+        for kw in (cat.keywords_en or []):
+            keywords_parts.add(kw)
+
+    return ' '.join(keywords_parts)
+
+
+def _run_search(search: JobSearch, category_keywords: str, auto_keywords: str) -> list:
     """
     Execute the job search across all selected platforms.
     Each crawler is isolated - one failure won't block others.
     Returns list of status messages to show to user.
     """
-    # Build final keywords: custom + auto from resume
+    # Build final keywords: category-based + custom + auto from resume
     keywords_parts = []
+    if category_keywords:
+        keywords_parts.append(category_keywords)
     if search.custom_keywords:
         keywords_parts.append(search.custom_keywords)
     if auto_keywords:
@@ -191,6 +260,12 @@ def _run_search(search: JobSearch, auto_keywords: str) -> list:
 
     all_results = []
     status_messages = []
+
+    # Get selected categories for platform-specific slug mapping
+    selected_cats = search.selected_categories or []
+    jobvision_cats = JobCategory.objects.filter(
+        slug__in=selected_cats, is_active=True
+    ).values_list('jobvision_slug', flat=True).distinct()
 
     # --- Jobvision (requests-based, no Playwright needed) ---
     if 'jobvision' in search.platforms:
@@ -203,6 +278,7 @@ def _run_search(search: JobSearch, auto_keywords: str) -> list:
                 level=search.level,
                 time_range=search.time_range,
                 max_pages=3,
+                category_slugs=list(jobvision_cats),
             )
             all_results.extend(results)
             status_messages.append(f'جاب‌ویژن: {len(results)} آگهی یافت شد')
@@ -319,6 +395,12 @@ def search_results(request, search_id):
         'irantalent': 'ایران‌تلنت',
     }
 
+    # Get selected category names for display
+    selected_cat_names = []
+    if search.selected_categories:
+        cats = JobCategory.objects.filter(slug__in=search.selected_categories)
+        selected_cat_names = [c.name for c in cats]
+
     return render(request, 'core/results.html', {
         'search': search,
         'resume': search.resume,
@@ -332,6 +414,7 @@ def search_results(request, search_id):
         'cities': [c for c in cities if c],
         'levels': [l for l in levels if l],
         'platform_names': PLATFORM_NAMES,
+        'selected_cat_names': selected_cat_names,
     })
 
 
@@ -351,3 +434,28 @@ def search_history(request):
     return render(request, 'core/history.html', {
         'searches': searches,
     })
+
+
+def suggest_categories_api(request, resume_id):
+    """
+    API endpoint: returns category suggestions for a resume.
+    Used for dynamic UI updates.
+    """
+    resume = get_object_or_404(Resume, pk=resume_id)
+    suggested = _get_suggested_categories(resume)
+
+    data = []
+    for cat, score in suggested:
+        data.append({
+            'slug': cat.slug,
+            'name': cat.name,
+            'score': score,
+            'color': cat.color,
+            'icon_svg': cat.icon_svg,
+            'matched_skills': list(set(
+                s for s in (resume.extracted_skills or [])
+                if s.lower() in set(sk.lower() for sk in (cat.skills or []))
+            ))[:5],
+        })
+
+    return JsonResponse({'categories': data})

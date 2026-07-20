@@ -3,55 +3,74 @@
 {% block nav_history %}active{% endblock %}
 
 {% block content %}
-<div class="card shadow-sm border-0">
-    <div class="card-header bg-white">
-        <h5 class="mb-0">
-            <i class="bi bi-clock-history text-primary me-2"></i>
-            تاریخچه جستجوها
-        </h5>
+<div class="jf-page-header">
+    <div class="jf-page-header-content">
+        <div>
+            <h1 class="jf-page-title">تاریخچه جستجوها</h1>
+            <p class="jf-page-subtitle">جستجوهای قبلی و نتایج آن‌ها</p>
+        </div>
+        <a href="{% url 'home' %}" class="jf-btn jf-btn-primary">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+            رزومه جدید
+        </a>
     </div>
-    {% if searches %}
-    <div class="list-group list-group-flush">
+</div>
+
+{% if searches %}
+<div class="jf-card">
+    <div class="jf-list">
         {% for s in searches %}
-        <a href="{% url 'search_results' s.id %}" class="list-group-item list-group-item-action px-4 py-3">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <h6 class="mb-1">
-                        رزومه #{{ s.resume.id }}
-                        {% if s.resume.suggested_category %}
-                        <span class="badge bg-info me-1">{{ s.resume.suggested_category }}</span>
-                        {% endif %}
-                    </h6>
-                    <small class="text-muted">
-                        <i class="bi bi-globe me-1"></i>{{ s.platforms|join:"، " }}
-                        <span class="me-3"><i class="bi bi-geo-alt me-1"></i>{{ s.city|default:"همه شهرها" }}</span>
-                        <span class="me-3"><i class="bi bi-bar-chart me-1"></i>{{ s.get_level_display }}</span>
-                    </small>
+        <a href="{% url 'search_results' s.id %}" class="jf-list-item jf-list-item-clickable">
+            <div class="jf-list-item-main">
+                <div class="jf-list-item-icon">
+                    <svg viewBox="0 0 20 20" fill="#6366f1" width="20" height="20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
                 </div>
-                <div class="text-end">
-                    {% if s.status == 'completed' %}
-                    <span class="badge bg-success">{{ s.total_results }} نتیجه</span>
-                    {% elif s.status == 'failed' %}
-                    <span class="badge bg-danger">ناموفق</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark">در حال اجرا</span>
-                    {% endif %}
-                    <div class="small text-muted mt-1">
-                        {{ s.created_at|date:"Y/m/d H:i" }}
+                <div>
+                    <div class="jf-list-item-title">رزومه #{{ s.resume.id }}</div>
+                    <div class="jf-list-item-meta">
+                        <span>{{ s.created_at|date:"Y/m/d H:i" }}</span>
+                        {% if s.resume.suggested_category %}
+                        <span class="jf-badge jf-badge-primary">{{ s.resume.suggested_category }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="jf-list-item-details">
+                        {% for p in s.platforms %}
+                        <span class="jf-badge jf-badge-{{ p }}">{% if p == 'jobvision' %}جاب‌ویژن{% elif p == 'e_estekhdam' %}ای‌استخدام{% else %}ایران‌تلنت{% endif %}</span>
+                        {% endfor %}
+                        <span class="jf-meta-text">{{ s.city|default:"همه شهرها" }}</span>
+                        <span class="jf-meta-text">{{ s.get_level_display }}</span>
                     </div>
                 </div>
+            </div>
+            <div class="jf-list-item-status">
+                {% if s.status == 'completed' %}
+                <span class="jf-status-badge jf-status-success">{{ s.total_results }} نتیجه</span>
+                {% elif s.status == 'failed' %}
+                <span class="jf-status-badge jf-status-failed">ناموفق</span>
+                {% else %}
+                <span class="jf-status-badge jf-status-running">در حال اجرا</span>
+                {% endif %}
             </div>
         </a>
         {% endfor %}
     </div>
-    {% else %}
-    <div class="card-body text-center py-5">
-        <i class="bi bi-inbox display-1 text-muted"></i>
-        <p class="text-muted mt-3">هنوز جستجویی انجام نشده است.</p>
-        <a href="{% url 'home' %}" class="btn btn-primary">
-            <i class="bi bi-plus me-1"></i>آپلود رزومه
-        </a>
-    </div>
-    {% endif %}
 </div>
+{% else %}
+<div class="jf-empty-state">
+    <svg viewBox="0 0 80 80" fill="none" width="80" height="80">
+        <rect x="10" y="16" width="60" height="48" rx="6" stroke="#e2e8f0" stroke-width="2"/>
+        <path d="M10 28h60" stroke="#e2e8f0" stroke-width="2"/>
+        <circle cx="22" cy="22" r="2" fill="#cbd5e1"/>
+        <circle cx="30" cy="22" r="2" fill="#cbd5e1"/>
+        <circle cx="38" cy="22" r="2" fill="#cbd5e1"/>
+        <path d="M28 42h24M32 50h16" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <h3 class="jf-empty-title">هنوز جستجویی انجام نشده</h3>
+    <p class="jf-empty-text">اولین رزومه خود را آپلود کنید</p>
+    <a href="{% url 'home' %}" class="jf-btn jf-btn-primary">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        آپلود رزومه
+    </a>
+</div>
+{% endif %}
 {% endblock %}

@@ -82,10 +82,12 @@ session.headers.update(HEADERS)
 
 
 def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
-                    time_range: str = '7', max_pages: int = 3) -> list:
+                    time_range: str = '7', max_pages: int = 3,
+                    category_slugs: list = None) -> list:
     """
     Crawl Jobvision for job listings.
     Returns list of dicts with job data.
+    category_slugs: list of Jobvision category slugs from JobCategory.jobvision_slug
     """
     results = []
     seen_ids = set()
@@ -95,13 +97,19 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
     if keywords.strip():
         filters['keyword'] = keywords.strip()
 
+    # Use category slugs for Jobvision's categorySlug filter
+    if category_slugs:
+        unique_slugs = list(set(s for s in category_slugs if s))
+        if unique_slugs:
+            filters['categorySlugs'] = unique_slugs
+
     if city and city in PROVINCE_SLUGS:
         filters['locationSlugs'] = [PROVINCE_SLUGS[city]]
 
     if level != 'all' and level in LEVEL_MAP:
         filters['seniorityLevelIds'] = [LEVEL_MAP[level]]
 
-    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', city={city}, level={level}")
+    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', city={city}, level={level}, categories={category_slugs}")
 
     for page in range(1, max_pages + 1):
         try:

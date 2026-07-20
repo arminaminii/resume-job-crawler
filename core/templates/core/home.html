@@ -3,122 +3,126 @@
 {% block nav_home %}active{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <!-- Upload Section -->
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body p-4">
-                <h2 class="card-title h5 mb-3">
-                    <i class="bi bi-cloud-upload text-primary me-2"></i>
-                    آپلود رزومه
-                </h2>
-                <p class="text-muted mb-3">
-                    رزومه خود را آپلود کنید تا مهارت‌ها و حوزه کاری شما با هوش مصنوعی تحلیل شود
-                    و آگهی‌های استخدام مرتبط از سامانه‌های کاریابی جمع‌آوری گردد.
-                </p>
-                <form method="post" enctype="multipart/form-data" id="uploadForm">
-                    {% csrf_token %}
-
-                    <!-- Drop Zone -->
-                    <div class="drop-zone border-2 border-dashed rounded-3 p-5 text-center mb-3"
-                         id="dropZone"
-                         ondragover="handleDragOver(event)"
-                         ondragleave="handleDragLeave(event)"
-                         ondrop="handleDrop(event)">
-                        <i class="bi bi-file-earmark-person display-4 text-muted"></i>
-                        <p class="mt-2 mb-1">فایل رزومه را اینجا بکشید و رها کنید</p>
-                        <p class="small text-muted">یا</p>
-                        <label class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-folder2-open me-1"></i>انتخاب فایل
-                            <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.docx,.txt" hidden id="fileInput">
-                        </label>
-                        <p class="small text-muted mt-2">
-                            فرمت‌های مجاز: PDF, PNG, JPG, DOCX, TXT
-                        </p>
-                    </div>
-
-                    <div id="fileInfo" class="d-none alert alert-light small">
-                        <i class="bi bi-file-earmark-check me-1"></i>
-                        <span id="fileName"></span>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 py-2" id="uploadBtn" disabled>
-                        <i class="bi bi-upload me-1"></i>
-                        آپلود و تحلیل رزومه
-                    </button>
-                </form>
-            </div>
+<div class="jf-page-header">
+    <div class="jf-page-header-content">
+        <div class="jf-page-icon-wrap">
+            <svg viewBox="0 0 48 48" fill="none" width="56" height="56">
+                <circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity="0.15"/>
+                <path d="M24 14v8l5 5" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="24" cy="24" r="3" fill="#6366f1" opacity="0.3"/>
+            </svg>
         </div>
-
-        <!-- Loading Overlay -->
-        <div class="card shadow-sm border-0 d-none" id="loadingCard">
-            <div class="card-body p-5 text-center">
-                <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">در حال پردازش...</span>
-                </div>
-                <h5>در حال تحلیل رزومه...</h5>
-                <p class="text-muted">
-                    <span id="loadingStep">استخراج متن رزومه با Tesseract OCR</span>
-                </p>
-                <div class="progress mt-3">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
-                </div>
-            </div>
+        <div>
+            <h1 class="jf-page-title">تحلیل هوشمند رزومه</h1>
+            <p class="jf-page-subtitle">رزومه خود را آپلود کنید تا مهارت‌ها و حوزه کاری با هوش مصنوعی تحلیل شود و آگهی‌های مرتبط جمع‌آوری گردد.</p>
         </div>
+    </div>
+</div>
 
-        <!-- Resume History -->
-        {% if resumes %}
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0">
-                    <i class="bi bi-clock-history text-secondary me-2"></i>
-                    رزومه‌های اخیر
-                </h5>
+<div class="jf-grid-center">
+    <div class="jf-card jf-upload-card">
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            {% csrf_token %}
+
+            <!-- Drop Zone -->
+            <div class="jf-dropzone" id="dropZone"
+                 ondragover="handleDragOver(event)"
+                 ondragleave="handleDragLeave(event)"
+                 ondrop="handleDrop(event)">
+                <div class="jf-dropzone-icon">
+                    <svg viewBox="0 0 64 64" fill="none" width="64" height="64">
+                        <rect x="8" y="4" width="48" height="56" rx="6" stroke="#c7d2fe" stroke-width="2" fill="#f0f0ff"/>
+                        <path d="M24 32h16M32 24v16" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M16 20h32M16 48h12" stroke="#a5b4fc" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <p class="jf-dropzone-text">فایل رزومه را بکشید و رها کنید</p>
+                <p class="jf-dropzone-sub">یا</p>
+                <label class="jf-btn jf-btn-outline-primary">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd"/></svg>
+                    انتخاب فایل
+                    <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.docx,.txt" hidden id="fileInput">
+                </label>
+                <p class="jf-dropzone-formats">PDF, PNG, JPG, DOCX, TXT</p>
             </div>
-            <div class="list-group list-group-flush">
-                {% for r in resumes %}
-                <div class="list-group-item px-4 py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1">
-                                <i class="bi bi-file-earmark-text me-1"></i>
-                                رزومه #{{ r.id }}
-                            </h6>
-                            <div class="small text-muted">
-                                {{ r.uploaded_at|date:"Y/m/d - H:i" }}
-                                {% if r.suggested_category %}
-                                <span class="badge bg-info me-1">{{ r.suggested_category }}</span>
-                                {% endif %}
-                                {% if r.confidence_score > 0 %}
-                                <span class="badge bg-success">اطمینان: {{ r.confidence_score|floatformat:0 }}%</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'search_config' r.id %}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-search me-1"></i>جستجو
-                            </a>
-                            <a href="{% url 'delete_resume' r.id %}" class="btn btn-sm btn-outline-danger"
-                               onclick="return confirm('آیا مطمئنید؟')">
-                                <i class="bi bi-trash"></i>
-                            </a>
-                        </div>
+
+            <div id="fileInfo" class="jf-file-info d-none">
+                <svg viewBox="0 0 20 20" fill="#10b981" width="18" height="18"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                <span id="fileName"></span>
+            </div>
+
+            <button type="submit" class="jf-btn jf-btn-primary jf-btn-full jf-btn-lg" id="uploadBtn" disabled>
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                آپلود و تحلیل رزومه
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Loading -->
+<div class="jf-grid-center d-none" id="loadingCard">
+    <div class="jf-card jf-loading-card">
+        <div class="jf-spinner"></div>
+        <h5 class="jf-loading-title">در حال تحلیل رزومه...</h5>
+        <p class="jf-loading-step" id="loadingStep">استخراج متن با Tesseract OCR</p>
+        <div class="jf-progress-bar">
+            <div class="jf-progress-fill jf-progress-animated"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Resume History -->
+{% if resumes %}
+<div class="jf-card jf-mt-lg">
+    <div class="jf-card-header">
+        <h2 class="jf-card-title">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+            رزومه‌های اخیر
+        </h2>
+    </div>
+    <div class="jf-list">
+        {% for r in resumes %}
+        <div class="jf-list-item">
+            <div class="jf-list-item-main">
+                <div class="jf-list-item-icon">
+                    <svg viewBox="0 0 20 20" fill="#6366f1" width="20" height="20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+                </div>
+                <div>
+                    <div class="jf-list-item-title">رزومه #{{ r.id }}</div>
+                    <div class="jf-list-item-meta">
+                        <span>{{ r.uploaded_at|date:"Y/m/d - H:i" }}</span>
+                        {% if r.suggested_category %}
+                        <span class="jf-badge jf-badge-primary">{{ r.suggested_category }}</span>
+                        {% endif %}
+                        {% if r.confidence_score > 0 %}
+                        <span class="jf-badge jf-badge-success">اطمینان: {{ r.confidence_score|floatformat:0 }}%</span>
+                        {% endif %}
                     </div>
                     {% if r.extracted_skills %}
-                    <div class="mt-2">
+                    <div class="jf-skill-chips">
                         {% for skill in r.extracted_skills|slice:":8" %}
-                        <span class="badge bg-light text-dark me-1">{{ skill }}</span>
+                        <span class="jf-chip">{{ skill }}</span>
                         {% endfor %}
                         {% if r.extracted_skills|length > 8 %}
-                        <span class="badge bg-light text-secondary">+{{ r.extracted_skills|length|add:"-8" }}</span>
+                        <span class="jf-chip jf-chip-muted">+{{ r.extracted_skills|length|add:"-8" }}</span>
                         {% endif %}
                     </div>
                     {% endif %}
                 </div>
-                {% endfor %}
+            </div>
+            <div class="jf-list-item-actions">
+                <a href="{% url 'search_config' r.id %}" class="jf-btn jf-btn-sm jf-btn-primary-soft">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+                    جستجو
+                </a>
+                <a href="{% url 'delete_resume' r.id %}" class="jf-btn jf-btn-sm jf-btn-danger-soft"
+                   onclick="return confirm('آیا مطمئنید؟')">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                </a>
             </div>
         </div>
-        {% endif %}
+        {% endfor %}
     </div>
 </div>
+{% endif %}
 {% endblock %}
