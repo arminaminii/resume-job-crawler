@@ -5,8 +5,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 LIST_API = "https://candidateapi.jobvision.ir/api/v1/JobPost/List"
-DETAIL_API = "https://candidateapi.jobvision.ir/api/v1/JobPost/Detail"
-FILTERS_API = "https://candidateapi.jobvision.ir/api/v1/JobPost/GetAllSearchFilters"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -73,9 +71,8 @@ CATEGORY_SLUGS = {
     'تولید محتوا و کپی‌رایتینگ': 'content',
 }
 
-# Timeouts
+# Timeout
 API_TIMEOUT = 20   # seconds per API call
-DETAIL_TIMEOUT = 15  # seconds per detail fetch
 
 session = requests.Session()
 session.headers.update(HEADERS)
@@ -173,30 +170,8 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
 
                 is_remote = job.get('isRemote', False)
 
-                # Get detail for description (with timeout protection)
-                description = ''
-                posted_date = ''
-                try:
-                    time.sleep(0.3)
-                    detail_resp = session.get(
-                        DETAIL_API,
-                        params={"jobPostId": job_id},
-                        timeout=DETAIL_TIMEOUT
-                    )
-                    if detail_resp.ok:
-                        detail_data = detail_resp.json()
-                        if detail_data.get('isSuccess'):
-                            d = detail_data['data']
-                            description = d.get('description', '')
-                            posted_date = d.get('publishedAtPersian', '')
-                except requests.Timeout:
-                    logger.debug(f"Detail fetch timeout for job {job_id}")
-                except Exception as e:
-                    logger.debug(f"Detail fetch error for {job_id}: {e}")
-
-                # Apply time range filter
-                if time_range != 'all' and posted_date:
-                    pass  # future: parse Persian date
+                # Get posted date from list data (no detail API call needed)
+                posted_date = job.get('publishedAtPersian', '') or ''
 
                 url = f"https://jobvision.ir/jobs/{job_id}"
 
@@ -209,7 +184,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     'salary': salary,
                     'job_type': work_type,
                     'seniority_level': seniority,
-                    'description': description,
+                    'description': '',
                     'skills': skills,
                     'url': url,
                     'remote': is_remote,

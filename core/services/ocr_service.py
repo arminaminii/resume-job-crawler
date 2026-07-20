@@ -48,35 +48,16 @@ def extract_text_from_image(image_path: str) -> str:
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract text from PDF files. Uses pdf2image + Tesseract for scanned PDFs."""
-    _setup_tesseract()
-    poppler_path = _get_poppler_path()
+    """
+    Extract text from PDF files.
+    Strategy: PyMuPDF (fast, text-based) -> pdf2image+Tesseract (image-based) -> PyPDF2
+    """
     text_parts = []
 
-    # Try pdf2image (requires Poppler) for image-based or all PDFs
-    try:
-        import pdf2image
-        kwargs = {'dpi': 300}
-        if poppler_path:
-            kwargs['poppler_path'] = poppler_path
-
-        logger.info(f"OCR: converting PDF to images (poppler={poppler_path or 'system'})")
-        images = pdf2image.convert_from_path(pdf_path, **kwargs)
-        for i, img in enumerate(images):
-            text = pytesseract.image_to_string(img, lang='fas+ara+eng')
-            text_parts.append(text.strip())
-            logger.info(f"OCR: PDF page {i+1}: extracted {len(text.strip())} chars")
-
-        result = '\n'.join(text_parts)
-        if result.strip():
-            return result
-    except Exception as e:
-        logger.warning(f"PDF pdf2image failed: {e}, trying text extraction fallback")
-
-    # Fallback 1: PyMuPDF (fitz) - best for text-based PDFs
+    # Step 1: PyMuPDF (fastest, works for text-based PDFs)
     try:
         import fitz  # PyMuPDF
-        logger.info("OCR: trying PyMuPDF text extraction")
+        logger.info(f"OCR: trying PyMuPDF for {pdf_path}")
         doc = fitz.open(pdf_path)
         for page in doc:
             t = page.get_text()
@@ -87,15 +68,17 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         if result.strip():
             logger.info(f"OCR: PyMuPDF extracted {len(result)} chars")
             return result
+        else:
+            logger.info("OCR: PyMuPDF found no text, PDF is likely image-based")
     except ImportError:
-        logger.debug("PyMuPDF not installed, skipping")
+        logger.info("OCR: PyMuPDF not installed")
     except Exception as e:
-        logger.debug(f"PyMuPDF extraction failed: {e}")
+        logger.warning(f"OCR: PyMuPDF failed: {e}")
 
-    # Fallback 2: PyPDF2
+    # Step 2: PyPDF2 (another text-based option)
     try:
         import PyPDF2
-        logger.info("OCR: trying PyPDF2 text extraction")
+        logger.info("OCR: trying PyPDF2")
         with open(pdf_path, 'rb') as f:
             reader = PyPDF2.PdfReader(f)
             for page in reader.pages:
@@ -107,9 +90,32 @@ def extract_text_from_pdf(pdf_path: str) -> str:
             logger.info(f"OCR: PyPDF2 extracted {len(result)} chars")
             return result
     except ImportError:
-        logger.debug("PyPDF2 not installed, skipping")
+        logger.debug("OCR: PyPDF2 not installed")
     except Exception as e:
-        logger.debug(f"PyPDF2 extraction failed: {e}")
+        logger.debug(f"OCR: PyPDF2 failed: {e}")
+
+    # Step 3: pdf2image + Tesseract (for scanned/image-based PDFs)
+    _setup_tesseract()
+    poppler_path = _get_poppler_path()
+    try:
+        import pdf2image
+        kwargs = {'dpi': 200}  # 200 DPI is enough and much faster than 300
+        if poppler_path:
+            kwargs['poppler_path'] = poppler_path
+
+        logger.info(f"OCR: converting PDF to images with Tesseract (poppler={poppler_path or 'not found'})")
+        images = pdf2image.convert_from_path(pdf_path, **kwargs)
+        for i, img in enumerate(images):
+            text = pytesseract.image_to_string(img, lang='fas+ara+eng')
+            text_parts.append(text.strip())
+            logger.info(f"OCR: Tesseract page {i+1}: extracted {len(text.strip())} chars")
+
+        result = '\n'.join(text_parts)
+        if result.strip():
+            logger.info(f"OCR: Tesseract total extracted {len(result)} chars")
+            return result
+    except Exception as e:
+        logger.error(f"OCR: pdf2image+Tesseract failed: {e}")
 
     logger.error("OCR: all PDF extraction methods failed")
     return ""
