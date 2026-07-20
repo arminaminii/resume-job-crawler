@@ -90,7 +90,7 @@
                         <label class="form-label fw-semibold">
                             <i class="bi bi-geo-alt me-1"></i>{{ form.city.label }}
                         </label>
-                        {{ form.city|add_class:"form-select" }}
+                        {{ form.city }}
                     </div>
 
                     <!-- Level -->
@@ -98,7 +98,7 @@
                         <label class="form-label fw-semibold">
                             <i class="bi bi-bar-chart me-1"></i>{{ form.level.label }}
                         </label>
-                        {{ form.level|add_class:"form-select" }}
+                        {{ form.level }}
                     </div>
 
                     <!-- Time Range -->
@@ -106,7 +106,7 @@
                         <label class="form-label fw-semibold">
                             <i class="bi bi-calendar3 me-1"></i>{{ form.time_range.label }}
                         </label>
-                        {{ form.time_range|add_class:"form-select" }}
+                        {{ form.time_range }}
                     </div>
 
                     <!-- Keywords -->
@@ -114,7 +114,7 @@
                         <label class="form-label fw-semibold">
                             <i class="bi bi-tag me-1"></i>{{ form.custom_keywords.label }}
                         </label>
-                        {{ form.custom_keywords|add_class:"form-control" }}
+                        {{ form.custom_keywords }}
                         {% if suggested_keywords %}
                         <div class="form-text">
                             <i class="bi bi-lightbulb text-warning me-1"></i>
