@@ -81,13 +81,23 @@ _TESSERACT_PATH = shutil.which('tesseract') or r'C:\Program Files\Tesseract-OCR\
 TESSERACT_CMD = _TESSERACT_PATH
 
 # Poppler - Windows path (auto-detects if not found)
-POPPLER_PATH = r'C:\poppler\Library\bin'
-if not os.path.isdir(POPPLER_PATH):
+# Check common Poppler install locations on Windows
+_POPPLER_SEARCH = [
+    r'C:\poppler\Library\bin',
+    r'C:\Program Files\poppler\Library\bin',
+    r'C:\Program Files (x86)\poppler\Library\bin',
+    r'C:\tools\poppler\Library\bin',
+    os.path.expandvars(r'%LOCALAPPDATA%\poppler\Library\bin'),
+]
+POPPLER_PATH = ''
+for _pp in _POPPLER_SEARCH:
+    if os.path.isdir(_pp):
+        POPPLER_PATH = _pp
+        break
+if not POPPLER_PATH:
     _poppler_bin = shutil.which('pdftoppm')
     if _poppler_bin:
         POPPLER_PATH = os.path.dirname(_poppler_bin)
-    else:
-        POPPLER_PATH = ''
 
 # BERT Model
 BERT_MODEL_NAME = 'HooshvareLab/bert-fa-base-uncased-sentiment-snappfood'
