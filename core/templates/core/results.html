@@ -1,0 +1,219 @@
+{% extends 'core/base.html' %}
+{% load custom_filters %}
+{% block title %}نتایج جستجو | JobFinder{% endblock %}
+
+{% block content %}
+<!-- Search Summary Bar -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body py-3">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <span class="badge bg-primary fs-6 px-3 py-2">
+                    <i class="bi bi-file-earmark-text me-1"></i>
+                    {{ resume.suggested_category|default:"رزومه" }}
+                </span>
+            </div>
+            <div class="col-md-4 text-center">
+                <h5 class="mb-0">
+                    <span class="text-primary">{{ total_count }}</span> آگهی استخدام
+                </h5>
+                <small class="text-muted">
+                    از {{ search.platforms|join:"، " }}
+                </small>
+            </div>
+            <div class="col-md-4 text-start">
+                <a href="{% url 'search_config' resume.id %}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-repeat me-1"></i>جستجوی مجدد
+                </a>
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-plus me-1"></i>رزومه جدید
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if search.status == 'failed' %}
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    خطا در جستجو: {{ search.error_message }}
+</div>
+{% endif %}
+
+<div class="row">
+    <!-- Sidebar Filters -->
+    <div class="col-lg-3 mb-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-funnel me-1"></i>فیلترها</h6>
+            </div>
+            <div class="card-body">
+                <form method="get" id="filterForm">
+                    <!-- Platform Filter -->
+                    {% if platforms %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">سامانه</label>
+                        {% for p in platforms %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="platform" value="{{ p }}"
+                                   id="pf-{{ p }}" {% if platform_filter == p %}checked{% endif %}
+                                   onchange="this.form.submit()">
+                            <label class="form-check-label small" for="pf-{{ p }}">
+                                {{ platform_names|get_item:p|default:p }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="platform" value=""
+                                   id="pf-all" {% if not platform_filter %}checked{% endif %}
+                                   onchange="this.form.submit()">
+                            <label class="form-check-label small" for="pf-all">همه</label>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- City Filter -->
+                    {% if cities %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">شهر</label>
+                        <select name="city" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">همه شهرها</option>
+                            {% for c in cities %}
+                            <option value="{{ c }}" {% if city_filter == c %}selected{% endif %}>{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <!-- Level Filter -->
+                    {% if levels %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">سطح</label>
+                        <select name="level" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">همه سطوح</option>
+                            {% for l in levels %}
+                            <option value="{{ l }}" {% if level_filter == l %}selected{% endif %}>{{ l }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <!-- Keyword Search -->
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">جستجو در نتایج</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="q" class="form-control" value="{{ keyword_filter }}"
+                                   placeholder="عنوان، شرکت...">
+                            <button class="btn btn-outline-primary" type="submit">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if platform_filter or city_filter or keyword_filter %}
+                    <a href="{% url 'search_results' search.id %}" class="btn btn-sm btn-outline-secondary w-100 mt-2">
+                        <i class="bi bi-x-circle me-1"></i>حذف فیلترها
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-lg-9">
+        {% if listings %}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted small">نمایش {{ total_count }} نتیجه</span>
+        </div>
+
+        {% for job in listings %}
+        <div class="card shadow-sm border-0 mb-3 job-card">
+            <div class="card-body p-3">
+                <div class="row">
+                    <div class="col">
+                        <!-- Platform Badge -->
+                        <span class="badge {% if job.platform == 'jobvision' %}bg-primary
+                                          {% elif job.platform == 'e_estekhdam' %}bg-success
+                                          {% else %}bg-warning text-dark{% endif %} mb-2">
+                            {{ platform_names|get_item:job.platform|default:job.platform }}
+                        </span>
+
+                        <!-- Title -->
+                        <h6 class="mb-1">
+                            {% if job.url %}
+                            <a href="{{ job.url }}" target="_blank" class="text-decoration-none">
+                                {{ job.title|default:"بدون عنوان" }}
+                            </a>
+                            {% else %}
+                            {{ job.title|default:"بدون عنوان" }}
+                            {% endif %}
+                        </h6>
+
+                        <!-- Company & Location -->
+                        <div class="text-muted small mb-2">
+                            {% if job.company %}
+                            <i class="bi bi-building me-1"></i>{{ job.company }}
+                            {% endif %}
+                            {% if job.city %}
+                            <span class="me-3"><i class="bi bi-geo-alt me-1"></i>{{ job.city }}</span>
+                            {% endif %}
+                            {% if job.remote %}
+                            <span class="badge bg-info me-1">دورکار</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Skills -->
+                        {% if job.skills %}
+                        <div class="mb-2">
+                            {% for skill in job.skills|slice:":6" %}
+                            <span class="badge bg-light text-dark me-1" style="font-size: 0.7rem;">{{ skill }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Meta Info -->
+                        <div class="d-flex flex-wrap gap-3 small text-muted">
+                            {% if job.seniority_level %}
+                            <span><i class="bi bi-bar-chart me-1"></i>{{ job.seniority_level }}</span>
+                            {% endif %}
+                            {% if job.salary %}
+                            <span><i class="bi bi-cash me-1"></i>{{ job.salary }}</span>
+                            {% endif %}
+                            {% if job.posted_date %}
+                            <span><i class="bi bi-calendar me-1"></i>{{ job.posted_date }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if job.url %}
+                    <div class="col-auto d-flex align-items-center">
+                        <a href="{{ job.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            مشاهده <i class="bi bi-box-arrow-up-left ms-1"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-search display-1 text-muted"></i>
+            <h5 class="mt-3 text-muted">نتیجه‌ای یافت نشد</h5>
+            <p class="text-muted">
+                {% if keyword_filter or platform_filter or city_filter %}
+                فیلترهای خود را تغییر دهید یا
+                <a href="{% url 'search_results' search.id %}">فیلترها را حذف کنید</a>
+                {% else %}
+                آگهی استخدامی با این معیارها یافت نشد. لطفاً تنظیمات جستجو را تغییر دهید.
+                {% endif %}
+            </p>
+            <a href="{% url 'search_config' resume.id %}" class="btn btn-primary">
+                <i class="bi bi-arrow-repeat me-1"></i>تغییر تنظیمات
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

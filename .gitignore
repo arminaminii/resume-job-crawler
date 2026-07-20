@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+*.egg-info/
+dist/
+build/
+skills/
+upload/
+download/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/resumes/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+.env.local
+
+# Misc
+.git/
+worklog.md
+resume-job-crawler/db.sqlite3
+download/
+.env
+resume-job-crawler/
+venv/

@@ -1,0 +1,90 @@
+/* JobFinder - Custom Styles */
+body {
+    background-color: #f8f9fa;
+    font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
+}
+
+/* Drop Zone */
+.drop-zone {
+    border: 2px dashed #dee2e6 !important;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background-color: #fafbfc;
+}
+.drop-zone:hover,
+.drop-zone.drag-over {
+    border-color: #0d6efd !important;
+    background-color: #e7f1ff;
+}
+
+/* Platform Cards */
+.platform-card {
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: 2px solid #e9ecef;
+    background: #fff;
+}
+.platform-card:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.platform-card.selected {
+    border-color: #0d6efd;
+    background-color: #e7f1ff;
+}
+.platform-card.selected .bi {
+    color: #0d6efd !important;
+}
+
+/* Job Cards */
+.job-card {
+    transition: all 0.2s ease;
+    border-right: 3px solid #0d6efd;
+}
+.job-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+.job-card h6 a {
+    color: #212529;
+}
+.job-card h6 a:hover {
+    color: #0d6efd;
+}
+
+/* Form Enhancements */
+.form-select, .form-control {
+    border-radius: 8px;
+}
+
+/* Navbar */
+.navbar {
+    font-family: Tahoma, Arial, sans-serif;
+}
+.navbar-brand {
+    font-size: 1.2rem;
+}
+
+/* Alerts */
+.alert {
+    border-radius: 10px;
+}
+
+/* Cards */
+.card {
+    border-radius: 12px;
+}
+
+/* Badges */
+.badge {
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+/* Small screen adjustments */
+@media (max-width: 768px) {
+    .container { padding: 0 12px; }
+    .card-body { padding: 1rem !important; }
+    .job-card { border-right-width: 2px; }
+}

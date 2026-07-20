@@ -1,0 +1,57 @@
+{% extends 'core/base.html' %}
+{% block title %}تاریخچه جستجوها | JobFinder{% endblock %}
+{% block nav_history %}active{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            <i class="bi bi-clock-history text-primary me-2"></i>
+            تاریخچه جستجوها
+        </h5>
+    </div>
+    {% if searches %}
+    <div class="list-group list-group-flush">
+        {% for s in searches %}
+        <a href="{% url 'search_results' s.id %}" class="list-group-item list-group-item-action px-4 py-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="mb-1">
+                        رزومه #{{ s.resume.id }}
+                        {% if s.resume.suggested_category %}
+                        <span class="badge bg-info me-1">{{ s.resume.suggested_category }}</span>
+                        {% endif %}
+                    </h6>
+                    <small class="text-muted">
+                        <i class="bi bi-globe me-1"></i>{{ s.platforms|join:"، " }}
+                        <span class="me-3"><i class="bi bi-geo-alt me-1"></i>{{ s.city|default:"همه شهرها" }}</span>
+                        <span class="me-3"><i class="bi bi-bar-chart me-1"></i>{{ s.get_level_display }}</span>
+                    </small>
+                </div>
+                <div class="text-end">
+                    {% if s.status == 'completed' %}
+                    <span class="badge bg-success">{{ s.total_results }} نتیجه</span>
+                    {% elif s.status == 'failed' %}
+                    <span class="badge bg-danger">ناموفق</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">در حال اجرا</span>
+                    {% endif %}
+                    <div class="small text-muted mt-1">
+                        {{ s.created_at|date:"Y/m/d H:i" }}
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body text-center py-5">
+        <i class="bi bi-inbox display-1 text-muted"></i>
+        <p class="text-muted mt-3">هنوز جستجویی انجام نشده است.</p>
+        <a href="{% url 'home' %}" class="btn btn-primary">
+            <i class="bi bi-plus me-1"></i>آپلود رزومه
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

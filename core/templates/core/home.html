@@ -1,0 +1,124 @@
+{% extends 'core/base.html' %}
+{% block title %}آپلود رزومه | JobFinder{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Upload Section -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h2 class="card-title h5 mb-3">
+                    <i class="bi bi-cloud-upload text-primary me-2"></i>
+                    آپلود رزومه
+                </h2>
+                <p class="text-muted mb-3">
+                    رزومه خود را آپلود کنید تا مهارت‌ها و حوزه کاری شما با هوش مصنوعی تحلیل شود
+                    و آگهی‌های استخدام مرتبط از سامانه‌های کاریابی جمع‌آوری گردد.
+                </p>
+                <form method="post" enctype="multipart/form-data" id="uploadForm">
+                    {% csrf_token %}
+
+                    <!-- Drop Zone -->
+                    <div class="drop-zone border-2 border-dashed rounded-3 p-5 text-center mb-3"
+                         id="dropZone"
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)"
+                         ondrop="handleDrop(event)">
+                        <i class="bi bi-file-earmark-person display-4 text-muted"></i>
+                        <p class="mt-2 mb-1">فایل رزومه را اینجا بکشید و رها کنید</p>
+                        <p class="small text-muted">یا</p>
+                        <label class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-folder2-open me-1"></i>انتخاب فایل
+                            <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.docx,.txt" hidden id="fileInput">
+                        </label>
+                        <p class="small text-muted mt-2">
+                            فرمت‌های مجاز: PDF, PNG, JPG, DOCX, TXT
+                        </p>
+                    </div>
+
+                    <div id="fileInfo" class="d-none alert alert-light small">
+                        <i class="bi bi-file-earmark-check me-1"></i>
+                        <span id="fileName"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-2" id="uploadBtn" disabled>
+                        <i class="bi bi-upload me-1"></i>
+                        آپلود و تحلیل رزومه
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="card shadow-sm border-0 d-none" id="loadingCard">
+            <div class="card-body p-5 text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">در حال پردازش...</span>
+                </div>
+                <h5>در حال تحلیل رزومه...</h5>
+                <p class="text-muted">
+                    <span id="loadingStep">استخراج متن رزومه با Tesseract OCR</span>
+                </p>
+                <div class="progress mt-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resume History -->
+        {% if resumes %}
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history text-secondary me-2"></i>
+                    رزومه‌های اخیر
+                </h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for r in resumes %}
+                <div class="list-group-item px-4 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">
+                                <i class="bi bi-file-earmark-text me-1"></i>
+                                رزومه #{{ r.id }}
+                            </h6>
+                            <div class="small text-muted">
+                                {{ r.uploaded_at|date:"Y/m/d - H:i" }}
+                                {% if r.suggested_category %}
+                                <span class="badge bg-info me-1">{{ r.suggested_category }}</span>
+                                {% endif %}
+                                {% if r.confidence_score > 0 %}
+                                <span class="badge bg-success">اطمینان: {{ r.confidence_score|floatformat:0 }}%</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'search_config' r.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-search me-1"></i>جستجو
+                            </a>
+                            <a href="{% url 'delete_resume' r.id %}" class="btn btn-sm btn-outline-danger"
+                               onclick="return confirm('آیا مطمئنید؟')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% if r.extracted_skills %}
+                    <div class="mt-2">
+                        {% for skill in r.extracted_skills|slice:":8" %}
+                        <span class="badge bg-light text-dark me-1">{{ skill }}</span>
+                        {% endfor %}
+                        {% if r.extracted_skills|length > 8 %}
+                        <span class="badge bg-light text-secondary">+{{ r.extracted_skills|length|add:"-8" }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

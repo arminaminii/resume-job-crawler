@@ -1,0 +1,152 @@
+{% extends 'core/base.html' %}
+{% block title %}تنظیمات جستجو | JobFinder{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+
+        <!-- Resume Summary -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-3">
+                    <i class="bi bi-person-badge text-primary me-2"></i>
+                    خلاصه رزومه #{{ resume.id }}
+                </h5>
+
+                {% if resume.suggested_category %}
+                <div class="mb-3">
+                    <span class="badge bg-primary fs-6 px-3 py-2">
+                        {{ resume.suggested_category }}
+                    </span>
+                    <span class="badge bg-success me-1">
+                        اطمینان: {{ resume.confidence_score|floatformat:0 }}%
+                    </span>
+                </div>
+                {% endif %}
+
+                {% if resume.extracted_skills %}
+                <div class="mb-3">
+                    <h6 class="small text-muted mb-2">مهارت‌های شناسایی شده:</h6>
+                    {% for skill in resume.extracted_skills %}
+                    <span class="badge bg-light text-dark me-1 mb-1">{{ skill }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if resume.extracted_fields %}
+                <div class="mb-2">
+                    <h6 class="small text-muted mb-2">حوزه‌های کاری:</h6>
+                    {% for field in resume.extracted_fields %}
+                    <span class="badge bg-info me-1 mb-1">{{ field }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Search Config Form -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-4">
+                    <i class="bi bi-gear text-primary me-2"></i>
+                    تنظیمات جستجو
+                </h5>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- Platforms -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-globe me-1"></i>سامانه‌های کاریابی
+                        </label>
+                        <div class="row g-3">
+                            {% for choice in form.platforms.field.choices %}
+                            <div class="col-md-4">
+                                <label class="platform-card border rounded-3 p-3 text-center cursor-pointer
+                                               {% if choice.0 in form.platforms.initial %}selected{% endif %}"
+                                       id="pc-{{ choice.0 }}">
+                                    <input type="checkbox" name="platforms" value="{{ choice.0 }}"
+                                           class="d-none platform-input"
+                                           {% if choice.0 in form.platforms.initial %}checked{% endif %}>
+                                    <div class="fs-5 mb-1">
+                                        {% if choice.0 == 'jobvision' %}
+                                        <i class="bi bi-briefcase text-primary"></i>
+                                        {% elif choice.0 == 'e_estekhdam' %}
+                                        <i class="bi bi-person-workspace text-success"></i>
+                                        {% else %}
+                                        <i class="bi bi-stars text-warning"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="fw-semibold small">{{ choice.1 }}</div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- City -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-geo-alt me-1"></i>{{ form.city.label }}
+                        </label>
+                        {{ form.city|add_class:"form-select" }}
+                    </div>
+
+                    <!-- Level -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-bar-chart me-1"></i>{{ form.level.label }}
+                        </label>
+                        {{ form.level|add_class:"form-select" }}
+                    </div>
+
+                    <!-- Time Range -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-calendar3 me-1"></i>{{ form.time_range.label }}
+                        </label>
+                        {{ form.time_range|add_class:"form-select" }}
+                    </div>
+
+                    <!-- Keywords -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-tag me-1"></i>{{ form.custom_keywords.label }}
+                        </label>
+                        {{ form.custom_keywords|add_class:"form-control" }}
+                        {% if suggested_keywords %}
+                        <div class="form-text">
+                            <i class="bi bi-lightbulb text-warning me-1"></i>
+                            پیشنهاد هوش مصنوعی: <code>{{ suggested_keywords }}</code>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg py-2" id="searchBtn">
+                            <i class="bi bi-search me-2"></i>
+                            شروع جستجو
+                        </button>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-right me-1"></i>بازگشت
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.platform-card').forEach(card => {
+    card.addEventListener('click', function() {
+        const input = this.querySelector('.platform-input');
+        input.checked = !input.checked;
+        this.classList.toggle('selected', input.checked);
+    });
+});
+</script>
+{% endblock %}
