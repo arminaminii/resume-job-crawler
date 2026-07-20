@@ -93,14 +93,9 @@
                 <div class="jf-category-grid" id="categoryGrid">
                     {% for cat in all_categories %}
                     {% if cat.slug != 'other' %}
-                    {% is_suggested = False %}
-                    {% for scat, sscore in suggested_categories %}
-                        {% if scat.slug == cat.slug %}
-                            {% is_suggested = True %}
-                        {% endif %}
-                    {% endfor %}
-                    <label class="jf-category-card {% if cat.slug in preselected_slugs %}checked{% endif %} {% if is_suggested %}suggested{% endif %}"
-                           data-slug="{{ cat.slug }}" data-color="{{ cat.color }}">
+                    <label class="jf-category-card {% if cat.slug in preselected_slugs %}checked{% endif %}"
+                           data-slug="{{ cat.slug }}" data-color="{{ cat.color }}"
+                           data-suggested="{% for scat, sscore in suggested_categories %}{% if scat.slug == cat.slug %}1{% endif %}{% endfor %}">
                         <input type="checkbox" name="categories" value="{{ cat.slug }}" class="jf-cat-input" {% if cat.slug in preselected_slugs %}checked{% endif %}>
                         <div class="jf-category-icon" style="color: {{ cat.color }}; background: {{ cat.color }}15;">
                             {{ cat.icon_svg|safe }}
@@ -241,6 +236,10 @@ document.querySelectorAll('.jf-platform-card').forEach(card => {
 
 // Category card toggle
 document.querySelectorAll('.jf-category-card').forEach(card => {
+    // Add 'suggested' class based on data attribute
+    if (card.dataset.suggested === '1') {
+        card.classList.add('suggested');
+    }
     card.addEventListener('click', function() {
         const input = this.querySelector('.jf-cat-input');
         input.checked = !input.checked;
