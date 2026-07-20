@@ -48,6 +48,21 @@ LEVEL_KEYWORDS = {
 }
 
 
+def _check_playwright_available():
+    """Check if Playwright + Chromium browser are available."""
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            try:
+                browser = p.chromium.launch(headless=True)
+                browser.close()
+                return True
+            except Exception:
+                return False
+    except ImportError:
+        return False
+
+
 def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
                      time_range: str = '7', max_pages: int = 3) -> list:
     """
@@ -71,15 +86,16 @@ def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
     for page in range(1, max_pages + 1):
         try:
             url = f"{BASE_URL}{search_path}" if page == 1 else f"{BASE_URL}{search_path}?page={page}"
-            resp = requests.get(url, headers=HEADERS, timeout=30)
+            resp = requests.get(url, headers=HEADERS, timeout=15)
 
             if resp.status_code == 403:
-                logger.warning("E-estekhdam returned 403, trying Playwright fallback...")
+                logger.warning("E-estekhdam returned 403 (WAF), trying Playwright fallback...")
                 return _crawl_with_playwright(
                     keywords, city, level, time_range, max_pages
                 )
 
             if not resp.ok:
+                logger.warning(f"E-estekhdam returned {resp.status_code}")
                 continue
 
             soup = BeautifulSoup(resp.text, 'lxml')
@@ -152,99 +168,107 @@ def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
 
 def _crawl_with_playwright(keywords, city, level, time_range, max_pages):
     """Fallback: use Playwright for JavaScript-rendered pages."""
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        logger.error("Playwright not available for e-estekhdam fallback")
+    if not _check_playwright_available():
+        logger.warning(
+            "E-estekhdam: Playwright/Chromium not available. "
+            "Cannot crawl this platform. Install Playwright browsers: "
+            "set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH env var or run 'playwright install chromium' with VPN."
+        )
         return []
 
     results = []
     seen_ids = set()
     level_keywords = LEVEL_KEYWORDS.get(level, [])
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=HEADERS["User-Agent"],
-            locale='fa-IR',
-        )
-        page = context.new_page()
+    try:
+        from playwright.sync_api import sync_playwright
 
-        if city and city in CITY_MAP:
-            url = f"{BASE_URL}/search/{CITY_MAP[city]}"
-        elif keywords.strip():
-            url = f"{BASE_URL}/search/{keywords.strip()}"
-        else:
-            url = BASE_URL
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent=HEADERS["User-Agent"],
+                locale='fa-IR',
+            )
+            page = context.new_page()
 
-        try:
-            page.goto(url, wait_until='networkidle', timeout=30000)
-            page.wait_for_timeout(2000)
-        except Exception as e:
-            logger.error(f"Playwright navigation failed: {e}")
-            browser.close()
-            return []
+            if city and city in CITY_MAP:
+                url = f"{BASE_URL}/search/{CITY_MAP[city]}"
+            elif keywords.strip():
+                url = f"{BASE_URL}/search/{keywords.strip()}"
+            else:
+                url = BASE_URL
 
-        for pg in range(max_pages):
             try:
-                items = page.query_selector_all('.job-list-item.item, [data-id]')
-                if not items:
-                    break
-
-                for item in items:
-                    jid = item.get_attribute('data-id') or ''
-                    if jid in seen_ids:
-                        continue
-                    seen_ids.add(jid)
-
-                    title_el = item.query_selector('.title span')
-                    title = title_el.inner_text().strip() if title_el else ''
-
-                    company_el = item.query_selector('.subtitle span')
-                    company = company_el.inner_text().strip() if company_el else ''
-
-                    prov_els = item.query_selector_all('.provinces .label')
-                    cities = [el.inner_text().strip() for el in prov_els]
-                    city_name = cities[0] if cities else (city or '')
-
-                    link_el = item.query_selector('a[href]')
-                    href = link_el.get_attribute('href') or '' if link_el else ''
-                    if href and not href.startswith('http'):
-                        href = f"{BASE_URL}{href}"
-
-                    if level != 'all' and level_keywords:
-                        item_text = item.inner_text()
-                        if not any(kw in item_text for kw in level_keywords):
-                            continue
-
-                    results.append({
-                        'platform': 'e_estekhdam',
-                        'title': title,
-                        'company': company,
-                        'city': city_name,
-                        'province': city_name,
-                        'salary': '',
-                        'job_type': '',
-                        'seniority_level': level if level != 'all' else '',
-                        'description': '',
-                        'skills': [],
-                        'url': href,
-                        'remote': False,
-                        'posted_date': '',
-                    })
-
-                # Try pagination
-                next_btn = page.query_selector('a.next, [rel="next"], .pagination .next')
-                if next_btn:
-                    next_btn.click()
-                    page.wait_for_timeout(2000)
-                else:
-                    break
-
+                page.goto(url, wait_until='networkidle', timeout=30000)
+                page.wait_for_timeout(2000)
             except Exception as e:
-                logger.error(f"Playwright page error: {e}")
-                break
+                logger.error(f"Playwright navigation failed: {e}")
+                browser.close()
+                return []
 
-        browser.close()
+            for pg in range(max_pages):
+                try:
+                    items = page.query_selector_all('.job-list-item.item, [data-id]')
+                    if not items:
+                        break
+
+                    for item in items:
+                        jid = item.get_attribute('data-id') or ''
+                        if jid in seen_ids:
+                            continue
+                        seen_ids.add(jid)
+
+                        title_el = item.query_selector('.title span')
+                        title = title_el.inner_text().strip() if title_el else ''
+
+                        company_el = item.query_selector('.subtitle span')
+                        company = company_el.inner_text().strip() if company_el else ''
+
+                        prov_els = item.query_selector_all('.provinces .label')
+                        cities = [el.inner_text().strip() for el in prov_els]
+                        city_name = cities[0] if cities else (city or '')
+
+                        link_el = item.query_selector('a[href]')
+                        href = link_el.get_attribute('href') or '' if link_el else ''
+                        if href and not href.startswith('http'):
+                            href = f"{BASE_URL}{href}"
+
+                        if level != 'all' and level_keywords:
+                            item_text = item.inner_text()
+                            if not any(kw in item_text for kw in level_keywords):
+                                continue
+
+                        results.append({
+                            'platform': 'e_estekhdam',
+                            'title': title,
+                            'company': company,
+                            'city': city_name,
+                            'province': city_name,
+                            'salary': '',
+                            'job_type': '',
+                            'seniority_level': level if level != 'all' else '',
+                            'description': '',
+                            'skills': [],
+                            'url': href,
+                            'remote': False,
+                            'posted_date': '',
+                        })
+
+                    # Try pagination
+                    next_btn = page.query_selector('a.next, [rel="next"], .pagination .next')
+                    if next_btn:
+                        next_btn.click()
+                        page.wait_for_timeout(2000)
+                    else:
+                        break
+
+                except Exception as e:
+                    logger.error(f"Playwright page error: {e}")
+                    break
+
+            browser.close()
+
+    except Exception as e:
+        logger.error(f"Playwright error: {e}")
 
     return results

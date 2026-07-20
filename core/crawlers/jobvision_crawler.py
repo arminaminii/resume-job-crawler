@@ -73,6 +73,10 @@ CATEGORY_SLUGS = {
     'تولید محتوا و کپی‌رایتینگ': 'content',
 }
 
+# Timeouts
+API_TIMEOUT = 20   # seconds per API call
+DETAIL_TIMEOUT = 15  # seconds per detail fetch
+
 session = requests.Session()
 session.headers.update(HEADERS)
 
@@ -97,6 +101,8 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
     if level != 'all' and level in LEVEL_MAP:
         filters['seniorityLevelIds'] = [LEVEL_MAP[level]]
 
+    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', city={city}, level={level}")
+
     for page in range(1, max_pages + 1):
         try:
             payload = {
@@ -105,7 +111,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                 "sort": 0,
                 "filters": filters,
             }
-            resp = session.post(LIST_API, json=payload, timeout=30)
+            resp = session.post(LIST_API, json=payload, timeout=API_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 
@@ -115,6 +121,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
 
             job_posts = data.get('data', {}).get('jobPosts', [])
             if not job_posts:
+                logger.info(f"Jobvision: no more jobs at page {page}")
                 break
 
             for job in job_posts:
@@ -158,7 +165,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
 
                 is_remote = job.get('isRemote', False)
 
-                # Get detail for description
+                # Get detail for description (with timeout protection)
                 description = ''
                 posted_date = ''
                 try:
@@ -166,7 +173,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     detail_resp = session.get(
                         DETAIL_API,
                         params={"jobPostId": job_id},
-                        timeout=20
+                        timeout=DETAIL_TIMEOUT
                     )
                     if detail_resp.ok:
                         detail_data = detail_resp.json()
@@ -174,13 +181,14 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                             d = detail_data['data']
                             description = d.get('description', '')
                             posted_date = d.get('publishedAtPersian', '')
+                except requests.Timeout:
+                    logger.debug(f"Detail fetch timeout for job {job_id}")
                 except Exception as e:
                     logger.debug(f"Detail fetch error for {job_id}: {e}")
 
                 # Apply time range filter
                 if time_range != 'all' and posted_date:
-                    # Simple check - if no date, include it
-                    pass
+                    pass  # future: parse Persian date
 
                 url = f"https://jobvision.ir/jobs/{job_id}"
 
@@ -200,11 +208,21 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     'posted_date': posted_date,
                 })
 
-            logger.info(f"Jobvision page {page}: got {len(job_posts)} jobs")
+            logger.info(f"Jobvision page {page}: got {len(job_posts)} jobs (total so far: {len(results)})")
             time.sleep(0.5)
 
+        except requests.Timeout:
+            logger.error(f"Jobvision API timeout at page {page}")
+            break
+        except requests.ConnectionError as e:
+            logger.error(f"Jobvision connection error at page {page}: {e}")
+            break
         except requests.RequestException as e:
             logger.error(f"Jobvision crawl error page {page}: {e}")
             break
+        except Exception as e:
+            logger.error(f"Jobvision unexpected error page {page}: {e}")
+            break
 
+    logger.info(f"Jobvision total: {len(results)} jobs")
     return results

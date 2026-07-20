@@ -73,8 +73,43 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
-# Tesseract OCR
-TESSERACT_CMD = r'/usr/bin/tesseract'
+# Tesseract OCR - Windows path (auto-detects if not found)
+import shutil
+import os
+
+_TESSERACT_PATH = shutil.which('tesseract') or r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+TESSERACT_CMD = _TESSERACT_PATH
+
+# Poppler - Windows path (auto-detects if not found)
+POPPLER_PATH = r'C:\poppler\Library\bin'
+if not os.path.isdir(POPPLER_PATH):
+    _poppler_bin = shutil.which('pdftoppm')
+    if _poppler_bin:
+        POPPLER_PATH = os.path.dirname(_poppler_bin)
+    else:
+        POPPLER_PATH = ''
 
 # BERT Model
 BERT_MODEL_NAME = 'HooshvareLab/bert-fa-base-uncased-sentiment-snappfood'
+
+# Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} [{levelname}] {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

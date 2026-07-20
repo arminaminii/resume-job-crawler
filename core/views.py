@@ -26,7 +26,9 @@ def home(request):
                 text = extract_resume_text(resume.file.path)
                 resume.full_text = text
 
-                # Classify with BERT
+                logger.info(f"Resume #{resume.id}: OCR extracted {len(text)} chars")
+
+                # Classify with BERT / rule-based
                 if text:
                     result = classify_resume(text)
                     resume.extracted_skills = result['skills']
@@ -34,14 +36,33 @@ def home(request):
                     resume.suggested_category = result['category']
                     resume.confidence_score = result['confidence']
                     resume.save()
-                    messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
+
+                    logger.info(
+                        f"Resume #{resume.id}: category={result['category']}, "
+                        f"confidence={result['confidence']}, "
+                        f"skills={result['skills']}, "
+                        f"fields={result['fields']}"
+                    )
+
+                    if result['skills'] or result['fields']:
+                        messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
+                    else:
+                        messages.warning(
+                            request,
+                            'رزومه آپلود شد ولی مهارت‌هایی شناسایی نشد. '
+                            'لطفاً کلمات کلیدی را دستی وارد کنید.'
+                        )
                 else:
                     resume.save()
-                    messages.warning(request, 'رزومه آپلود شد ولی متنی استخراج نشد.')
+                    messages.warning(
+                        request,
+                        'متنی از رزومه استخراج نشد. '
+                        'اگر فایل PDF تصویری است، مطمئن شوید Poppler نصب شده.'
+                    )
             except Exception as e:
-                logger.error(f"Resume processing error: {e}")
+                logger.error(f"Resume #{resume.id} processing error: {e}", exc_info=True)
                 resume.save()
-                messages.error(request, f'خطا در پردازش رزومه: {str(e)}')
+                messages.error(request, f'خطا در پردازش رزومه: {str(e)[:200]}')
 
             return redirect('search_config', resume_id=resume.id)
 
@@ -62,6 +83,8 @@ def upload_resume(request):
                 text = extract_resume_text(resume.file.path)
                 resume.full_text = text
 
+                logger.info(f"Resume #{resume.id}: OCR extracted {len(text)} chars")
+
                 if text:
                     result = classify_resume(text)
                     resume.extracted_skills = result['skills']
@@ -69,14 +92,18 @@ def upload_resume(request):
                     resume.suggested_category = result['category']
                     resume.confidence_score = result['confidence']
                     resume.save()
-                    messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
+
+                    if result['skills'] or result['fields']:
+                        messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
+                    else:
+                        messages.warning(request, 'مهارت‌هایی شناسایی نشد. کلمات کلیدی را دستی وارد کنید.')
                 else:
                     resume.save()
-                    messages.warning(request, 'متنی از رزومه استخراج نشد. لطفاً فایل متنی آپلود کنید.')
+                    messages.warning(request, 'متنی از رزومه استخراج نشد.')
             except Exception as e:
-                logger.error(f"Resume processing error: {e}")
+                logger.error(f"Resume #{resume.id} processing error: {e}", exc_info=True)
                 resume.save()
-                messages.error(request, f'خطا در پردازش رزومه')
+                messages.error(request, 'خطا در پردازش رزومه')
 
             return redirect('search_config', resume_id=resume.id)
 
@@ -111,12 +138,27 @@ def search_config(request, resume_id):
 
             # Run crawling (could be async with Celery in production)
             try:
-                _run_search(search, suggested_keywords)
+                crawler_messages = _run_search(search, suggested_keywords)
                 search.status = 'completed'
+
+                # Show helpful messages about which platforms worked
+                for msg in crawler_messages:
+                    if 'error' in msg.lower() or 'not available' in msg.lower():
+                        messages.warning(request, msg)
+                    else:
+                        messages.info(request, msg)
+
+                if not search.total_results:
+                    messages.info(
+                        request,
+                        'نتیجه‌ای یافت نشد. عبارت جستجو را تغییر دهید '
+                        'یا فقط جاب‌ویژن را انتخاب کنید.'
+                    )
             except Exception as e:
                 search.status = 'failed'
                 search.error_message = str(e)
-                logger.error(f"Search {search.id} failed: {e}")
+                logger.error(f"Search {search.id} failed: {e}", exc_info=True)
+                messages.error(request, f'خطا در جستجو: {str(e)[:200]}')
             finally:
                 search.save()
 
@@ -133,8 +175,12 @@ def search_config(request, resume_id):
     })
 
 
-def _run_search(search: JobSearch, auto_keywords: str):
-    """Execute the job search across all selected platforms."""
+def _run_search(search: JobSearch, auto_keywords: str) -> list:
+    """
+    Execute the job search across all selected platforms.
+    Each crawler is isolated - one failure won't block others.
+    Returns list of status messages to show to user.
+    """
     # Build final keywords: custom + auto from resume
     keywords_parts = []
     if search.custom_keywords:
@@ -144,42 +190,74 @@ def _run_search(search: JobSearch, auto_keywords: str):
     keywords = ' '.join(keywords_parts)
 
     all_results = []
+    status_messages = []
 
+    # --- Jobvision (requests-based, no Playwright needed) ---
     if 'jobvision' in search.platforms:
-        from .crawlers.jobvision_crawler import crawl_jobvision
-        results = crawl_jobvision(
-            keywords=keywords,
-            city=search.city,
-            level=search.level,
-            time_range=search.time_range,
-            max_pages=3,
-        )
-        all_results.extend(results)
-        logger.info(f"Jobvision: {len(results)} results")
+        try:
+            from .crawlers.jobvision_crawler import crawl_jobvision
+            logger.info("Starting Jobvision crawl...")
+            results = crawl_jobvision(
+                keywords=keywords,
+                city=search.city,
+                level=search.level,
+                time_range=search.time_range,
+                max_pages=3,
+            )
+            all_results.extend(results)
+            status_messages.append(f'جاب‌ویژن: {len(results)} آگهی یافت شد')
+            logger.info(f"Jobvision: {len(results)} results")
+        except Exception as e:
+            msg = f'جاب‌ویژن: خطا - {str(e)[:100]}'
+            status_messages.append(msg)
+            logger.error(f"Jobvision crawl failed: {e}", exc_info=True)
 
+    # --- E-estekhdam (BS4 + optional Playwright fallback) ---
     if 'e_estekhdam' in search.platforms:
-        from .crawlers.estekhdam_crawler import crawl_estekhdam
-        results = crawl_estekhdam(
-            keywords=keywords,
-            city=search.city,
-            level=search.level,
-            time_range=search.time_range,
-            max_pages=3,
-        )
-        all_results.extend(results)
-        logger.info(f"E-estekhdam: {len(results)} results")
+        try:
+            from .crawlers.estekhdam_crawler import crawl_estekhdam
+            logger.info("Starting E-estekhdam crawl...")
+            results = crawl_estekhdam(
+                keywords=keywords,
+                city=search.city,
+                level=search.level,
+                time_range=search.time_range,
+                max_pages=3,
+            )
+            all_results.extend(results)
+            status_messages.append(f'ای‌استخدام: {len(results)} آگهی یافت شد')
+            logger.info(f"E-estekhdam: {len(results)} results")
+        except Exception as e:
+            msg = f'ای‌استخدام: خطا - {str(e)[:100]}'
+            status_messages.append(msg)
+            logger.error(f"E-estekhdam crawl failed: {e}", exc_info=True)
 
+    # --- IranTalent (Playwright-only, Angular SPA) ---
     if 'irantalent' in search.platforms:
-        from .crawlers.irantalent_crawler import crawl_irantalent
-        results = crawl_irantalent(
-            keywords=keywords,
-            city=search.city,
-            level=search.level,
-            time_range=search.time_range,
-            max_pages=3,
-        )
-        all_results.extend(results)
-        logger.info(f"IranTalent: {len(results)} results")
+        try:
+            from .crawlers.irantalent_crawler import crawl_irantalent
+            logger.info("Starting IranTalent crawl...")
+            results = crawl_irantalent(
+                keywords=keywords,
+                city=search.city,
+                level=search.level,
+                time_range=search.time_range,
+                max_pages=3,
+            )
+            all_results.extend(results)
+            if results:
+                status_messages.append(f'ایران‌تلنت: {len(results)} آگهی یافت شد')
+            else:
+                status_messages.append(
+                    'ایران‌تلنت: نتایجی یافت نشد. '
+                    'این پلتفرم به Playwright/Chromium نیاز دارد. '
+                    'با VPN دستور playwright install chromium را اجرا کنید.'
+                )
+            logger.info(f"IranTalent: {len(results)} results")
+        except Exception as e:
+            msg = f'ایران‌تلنت: خطا - {str(e)[:100]}'
+            status_messages.append(msg)
+            logger.error(f"IranTalent crawl failed: {e}", exc_info=True)
 
     # Save to DB
     search.total_results = len(all_results)
@@ -200,6 +278,8 @@ def _run_search(search: JobSearch, auto_keywords: str):
             remote=data.get('remote', False),
             posted_date=data.get('posted_date', ''),
         )
+
+    return status_messages
 
 
 def search_results(request, search_id):
