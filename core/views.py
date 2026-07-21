@@ -15,7 +15,7 @@ from .services.bert_classifier import classify_resume, suggest_search_keywords
 logger = logging.getLogger(__name__)
 
 # Max seconds each crawler is allowed to run before we kill it
-CRAWLER_TIMEOUT_SECONDS = 45
+CRAWLER_TIMEOUT_SECONDS = 60
 
 
 def home(request):
@@ -212,7 +212,8 @@ def search_config(request, resume_id):
 
             # Run crawling (with per-crawler timeout protection)
             try:
-                crawler_messages = _run_search(search, cat_keywords, suggested_keywords)
+                client_filter_kw = _build_client_filter_keywords(selected_cats)
+                crawler_messages = _run_search(search, client_filter_kw, suggested_keywords)
                 search.status = 'completed'
 
                 for msg in crawler_messages:
@@ -257,31 +258,29 @@ def search_config(request, resume_id):
     })
 
 
-def _build_category_keywords(selected_slugs: list) -> str:
+def _build_client_filter_keywords(selected_slugs: list) -> list:
     """
-    Build search keywords from selected category slugs.
-    Returns a SHORT, focused keyword string for the API keyword filter.
-    Category-based filtering is handled separately via categorySlugs.
+    Build a list of keywords from selected categories for CLIENT-SIDE filtering.
+    These are NOT sent to APIs (to avoid conflicting with categorySlugs).
+    Returns list of lowercase keyword strings.
     """
     if not selected_slugs:
-        return ''
+        return []
 
-    keywords_parts = set()
+    keywords = set()
     categories = JobCategory.objects.filter(slug__in=selected_slugs, is_active=True)
 
     for cat in categories:
-        # Only add top 3 most specific English skills (avoid generic ones)
-        for skill in (cat.skills or [])[:3]:
-            keywords_parts.add(skill)
-        # Add top 2 positions
-        for pos in (cat.positions or [])[:2]:
-            # Only add English positions (Persian ones confuse the API)
-            if any(c.isascii() for c in pos):
-                keywords_parts.add(pos)
+        for skill in (cat.skills or []):
+            keywords.add(skill.lower())
+        for pos in (cat.positions or []):
+            keywords.add(pos.lower())
+        for kw in (cat.keywords_fa or []):
+            keywords.add(kw.lower())
+        for kw in (cat.keywords_en or []):
+            keywords.add(kw.lower())
 
-    # Limit to max 8 keywords total to keep API query reasonable
-    result = list(keywords_parts)[:8]
-    return ' '.join(result)
+    return list(keywords)
 
 
 def _run_crawler_safe(crawler_func, crawler_name, **kwargs) -> tuple:
@@ -306,24 +305,29 @@ def _run_crawler_safe(crawler_func, crawler_name, **kwargs) -> tuple:
         return [], f'{crawler_name}: خطا - {str(e)[:80]}'
 
 
-def _run_search(search: JobSearch, category_keywords: str, auto_keywords: str) -> list:
+def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str) -> list:
     """
     Execute the job search across all selected platforms.
-    Each crawler runs with a hard timeout so one failure doesn't block others.
-    Returns list of status messages to show to user.
+
+    KEY DESIGN: keyword handling is separated:
+    - user_keywords: only the user's explicit custom input → sent to API
+    - auto_keywords: generated from resume by BERT → sent to API as supplement
+    - category_filter_kw: skills/positions from selected categories → CLIENT-SIDE only
+
+    This avoids the critical bug where categorySlugs + keyword created an
+    AND filter that returned zero results.
     """
-    # Build final keywords: category-based + custom + auto from resume
-    keywords_parts = []
-    if category_keywords:
-        keywords_parts.append(category_keywords)
+    # Build API keywords: ONLY user's custom + auto from resume (NOT category-derived)
+    api_keywords_parts = []
     if search.custom_keywords:
-        keywords_parts.append(search.custom_keywords)
+        api_keywords_parts.append(search.custom_keywords)
     if auto_keywords:
-        keywords_parts.append(auto_keywords)
-    keywords = ' '.join(keywords_parts)
+        api_keywords_parts.append(auto_keywords)
+    api_keywords = ' '.join(api_keywords_parts)
 
     logger.info(f"Running search #{search.id}: platforms={search.platforms}, "
-                f"keywords='{keywords[:80]}', city={search.city}")
+                f"api_keywords='{api_keywords[:80]}', city={search.city}, "
+                f"client_filter_keywords={len(category_filter_kw)} terms")
 
     all_results = []
     status_messages = []
@@ -336,45 +340,59 @@ def _run_search(search: JobSearch, category_keywords: str, auto_keywords: str) -
     # Filter out empty slugs
     jobvision_cats = [s for s in jobvision_cats if s]
 
+    estekhdam_cats = list(JobCategory.objects.filter(
+        slug__in=selected_cats, is_active=True
+    ).values_list('estekhdam_slug', flat=True).distinct())
+    estekhdam_cats = [s for s in estekhdam_cats if s]
+
+    irantalent_cats = list(JobCategory.objects.filter(
+        slug__in=selected_cats, is_active=True
+    ).values_list('irantalent_slug', flat=True).distinct())
+    irantalent_cats = [s for s in irantalent_cats if s]
+
     # --- Jobvision (requests-based, fast REST API) ---
     if 'jobvision' in search.platforms:
         from .crawlers.jobvision_crawler import crawl_jobvision
         results, msg = _run_crawler_safe(
             crawl_jobvision, 'جاب‌ویژن',
-            keywords=keywords,
+            keywords=api_keywords,
             city=search.city,
             level=search.level,
             time_range=search.time_range,
-            max_pages=2,
+            max_pages=3,
             category_slugs=jobvision_cats,
+            client_filter_keywords=category_filter_kw,
         )
         all_results.extend(results)
         status_messages.append(msg)
 
-    # --- E-estekhdam (BS4 + optional Playwright fallback) ---
+    # --- E-estekhdam (REST API) ---
     if 'e_estekhdam' in search.platforms:
         from .crawlers.estekhdam_crawler import crawl_estekhdam
         results, msg = _run_crawler_safe(
             crawl_estekhdam, 'ای‌استخدام',
-            keywords=keywords,
+            keywords=api_keywords,
             city=search.city,
             level=search.level,
             time_range=search.time_range,
-            max_pages=2,
+            max_pages=3,
+            category_slugs=estekhdam_cats,
+            client_filter_keywords=category_filter_kw,
         )
         all_results.extend(results)
         status_messages.append(msg)
 
-    # --- IranTalent (API + Playwright fallback) ---
+    # --- IranTalent (Playwright) ---
     if 'irantalent' in search.platforms:
         from .crawlers.irantalent_crawler import crawl_irantalent
         results, msg = _run_crawler_safe(
             crawl_irantalent, 'ایران‌تلنت',
-            keywords=keywords,
+            keywords=api_keywords,
             city=search.city,
             level=search.level,
             time_range=search.time_range,
-            max_pages=2,
+            max_pages=3,
+            client_filter_keywords=category_filter_kw,
         )
         all_results.extend(results)
         status_messages.append(msg)
@@ -505,3 +523,21 @@ def suggest_categories_api(request, resume_id):
         })
 
     return JsonResponse({'categories': data})
+
+
+def job_tree(request):
+    """Display the interactive job category tree with skills, education, and career paths."""
+    # Get all root (parent-less) categories
+    roots = JobCategory.objects.filter(parent=None, is_active=True).order_by('sort_order')
+    return render(request, 'core/job_tree.html', {
+        'roots': roots,
+        'total_categories': JobCategory.objects.filter(is_active=True).count(),
+    })
+
+
+@cache_page(60 * 15)
+def job_tree_api(request):
+    """API: returns full tree as JSON for interactive frontend."""
+    roots = JobCategory.objects.filter(parent=None, is_active=True).order_by('sort_order')
+    tree = [r.get_tree_data() for r in roots]
+    return JsonResponse({'tree': tree, 'total': len(tree)})

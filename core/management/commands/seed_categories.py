@@ -277,19 +277,69 @@ CATEGORIES = [
      'skills': [], 'positions': [], 'kw_fa': [], 'kw_en': []},
 ]
 
+# Job tree enrichment data: education, certifications, salary range, career path
+TREE_DATA = {
+    'developer': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۵ تا ۷۰ میلیون تومان', 'path': 'جونیور > میان‌رده > ارشد > Tech Lead > CTO'},
+    'frontend': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'جونیور فرانت > ارشد فرانت > Lead Frontend > Frontend Architect'},
+    'backend': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'جونیور بک‌اند > ارشد بک‌اند > Tech Lead > Software Architect'},
+    'mobile': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۵ تا ۵۵ میلیون تومان', 'path': 'جونیور موبایل > ارشد موبایل > Mobile Lead > Mobile Architect'},
+    'data-science': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': ['Google Data Analytics'], 'salary': '۲۰ تا ۸۰ میلیون تومان', 'path': 'تحلیلگر داده > دانشمند داده > Senior Data Scientist > Head of Data'},
+    'ai-ml': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': ['TensorFlow Certificate', 'AWS ML'], 'salary': '۲۵ تا ۱۰۰ میلیون تومان', 'path': 'ML Engineer > Senior ML > AI Lead > AI Director'},
+    'devops': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['AWS Solutions Architect', 'Docker Certified', 'Kubernetes CKA'], 'salary': '۲۰ تا ۷۰ میلیون تومان', 'path': 'DevOps Junior > DevOps Engineer > SRE > Platform Engineer > DevOps Lead'},
+    'network': {'edu': ['کارشناسی', 'Bachelor', 'Network+'], 'certs': ['CCNA', 'CCNP', 'MikroTik MTCNA'], 'salary': '۱۰ تا ۴۵ میلیون تومان', 'path': 'تکنسین شبکه > مهندس شبکه > مدیر شبکه > IT Manager'},
+    'security': {'edu': ['کارشناسی ارشد', 'Master'], 'certs': ['CEH', 'OSCP', 'CompTIA Security+'], 'salary': '۲۵ تا ۹۰ میلیون تومان', 'path': 'تحلیلگر امنیت > مهندس امنیت > Security Lead > CISO'},
+    'qa-testing': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['ISTQB'], 'salary': '۱۰ تا ۴۰ میلیون تومان', 'path': 'تستر دستی > تستر اتومیشن > QA Lead > SDET Lead > Head of QA'},
+    'game-dev': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'جونیور بازی > گیم دولوپر > سینیر گیمر > Lead Game Developer > Technical Director'},
+    'database': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['Oracle OCP', 'PostgreSQL Certified'], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'DBA Junior > DBA > Senior DBA > Database Architect > Data Platform Lead'},
+    'ui-ux': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['Google UX Design'], 'salary': '۱۰ تا ۴۵ میلیون تومان', 'path': 'طراحح مبتدی > UI Designer > UX Designer > Product Designer > Design Director'},
+    'web-design': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۸ تا ۳۵ میلیون تومان', 'path': 'طراح وب مبتدی > طراح وب > ارشد طراح وب > Art Director'},
+    'animation': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۰ تا ۴۰ میلیون تومان', 'path': 'انیماتور مبتدی > انیماتور > ارشد > Animation Director'},
+    'photography': {'edu': ['دیپلم', 'Associate'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'عکاس مبتدی > عکاس حرفه‌ای > سرپرست تیم > استودیو'},
+    'digital-marketing': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['Google Ads', 'Google Analytics', 'HubSpot'], 'salary': '۱۰ تا ۵۰ میلیون تومان', 'path': 'بازاریاب مبتدی > متخصص دیجیتال > مدیر بازاریابی > CMO'},
+    'sales': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': [], 'salary': '۱۰ تا ۶۰ میلیون تومان', 'path': 'فروشنده > نماینده > مدیر فروش > Sales Director > VP Sales'},
+    'pr-branding': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': [], 'salary': '۱۲ تا ۴۵ میلیون تومان', 'path': 'کارشناس PR > مدیر PR > Brand Manager > Communications Director'},
+    'content': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۸ تا ۳۵ میلیون تومان', 'path': 'نویسنده مبتدی > کپی‌رایتر > Content Manager > Head of Content'},
+    'accounting': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['CMA', 'ACCA', 'CIA'], 'salary': '۱۰ تا ۴۵ میلیون تومان', 'path': 'حسابدار > حسابدار ارشد > مدیر مالی > CFO'},
+    'trade-finance': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': ['CFA'], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'تحلیلگر مالی > مدیر مالی > CFO'},
+    'finance': {'edu': ['کارشناسی ارشد', 'Master', 'MBA'], 'certs': ['CFA', 'FRM'], 'salary': '۲۰ تا ۸۰ میلیون تومان', 'path': 'تحلیلگر > مدیر سرمایه‌گذاری > مدیر عامل مالی'},
+    'hr': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': ['SHRM', 'PHR'], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'کارشناس HR > مدیر HR > HR Business Partner > CHRO'},
+    'management': {'edu': ['کارشناسی ارشد', 'Master', 'MBA'], 'certs': ['PMP'], 'salary': '۲۵ تا ۱۰۰ میلیون تومان', 'path': 'مدیر عملیات > مدیر ارشد > مدیرعامل > CEO'},
+    'project-mgmt': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': ['PMP', 'PRINCE2', 'Scrum Master'], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'هماهنگ‌کننده > مدیر پروژه > Senior PM > PMO Director'},
+    'civil-eng': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'مهندس مبتدی > مهندس ارشد > مدیر پروژه > مدیر فنی'},
+    'industrial-eng': {'edu': ['کارشناسی', 'Master'], 'certs': [], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'مهندس صنایع > ارشد > مدیر تولید > مدیر کارخانه'},
+    'mechanical-eng': {'edu': ['کارشناسی', 'Master'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'مهندس مکانیک > ارشد > مدیر مهندسی > مدیر فنی'},
+    'electrical-eng': {'edu': ['کارشناسی', 'Master'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'مهندس برق > ارشد > مدیر پروژه برق > مدیر فنی'},
+    'medical': {'edu': ['دکترای عمومی', 'MD', 'GP'], 'certs': ['بورد تخصصی'], 'salary': '۲۵ تا ۱۵۰ میلیون تومان', 'path': 'پزشک عمومی > متخصص > فوق تخصص > استاد دانشگاه'},
+    'nursing': {'edu': ['کارشناسی پرستاری', 'BSc Nursing'], 'certs': [], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'پرستار > سرپرستار > مدیر پرستاری > مدیر آموزش پرستاری'},
+    'pharmacy-lab': {'edu': ['دکترای داروسازی', 'PharmD'], 'certs': [], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'داروساز > مسئول فنی > مدیر آزمایشگاه > مدیر داروخانه'},
+    'education': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'معلم > استاد > استادیار > دانشیار > استاد تمام'},
+    'research': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': [], 'salary': '۱۵ تا ۴۰ میلیون تومان', 'path': 'محقق > پژوهشگر ارشد > استادیار > استاد'},
+    'legal': {'edu': ['کارشناسی ارشد', 'Master', 'PhD Law'], 'certs': ['گذرنامه وکالت'], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'کارآموز وکالت > وکیل > وکیل ارشد > شریک دفتر > قاضی'},
+    'logistics': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۰ تا ۴۰ میلیون تومان', 'path': 'کارشناس لجستیک > مدیر انبار > مدیر لجستیک > مدیر کل زنجیره تامین'},
+    'agriculture': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'مهندس کشاورزی > کارشناس ارشد > مدیر مزرعه > مشاور'},
+    'translation': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'مترجم مبتدی > مترجم حرفه‌ای > مترجم ارشد > مدیر تیم ترجمه'},
+    'administrative': {'edu': ['دیپلم', 'Associate', 'Bachelor'], 'certs': ['ICDL'], 'salary': '۸ تا ۲۵ میلیون تومان', 'path': 'کارشناس اداری > منشی > مدیر دفتر > مدیر اداری'},
+    'tourism-hospitality': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'کارشناس هتل > مدیر رزرویشن > مدیر هتل > مدیر گردشگری'},
+    'journalism': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'خبرنگار مبتدی > گزارشگر > سردبیر > سردبیر ارشد > مدیر تحریریه'},
+    'trades': {'edu': ['دیپلم فنی', 'فوق دیپلم'], 'certs': [], 'salary': '۸ تا ۲۵ میلیون تومان', 'path': 'شاگرد > تکنسین > استادکار > سرپرست کارگاه'},
+    'lab-environment': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': ['HSE', 'ISO 14001'], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'تکنسین آزمایشگاه > کارشناس HSE > مدیر HSE > مدیر محیط زیست'},
+}
+
 
 class Command(BaseCommand):
-    help = 'Seed job categories'
+    help = 'Seed job categories with full tree data'
 
     def handle(self, *args, **options):
         created = 0
         updated = 0
         for c in CATEGORIES:
-            # Resolve parent
             parent_obj = None
             parent_slug = c.get('parent', '')
             if parent_slug:
                 parent_obj = JobCategory.objects.filter(slug=parent_slug).first()
+
+            # Get tree enrichment data
+            td = TREE_DATA.get(c['slug'], {})
 
             obj, is_new = JobCategory.objects.update_or_create(
                 slug=c['slug'],
@@ -300,10 +350,15 @@ class Command(BaseCommand):
                     'color': c['color'],
                     'jobvision_slug': c.get('jv', ''),
                     'estekhdam_slug': c.get('es', ''),
+                    'irantalent_slug': c.get('it', ''),
                     'skills': c['skills'],
                     'positions': c['positions'],
                     'keywords_fa': c['kw_fa'],
                     'keywords_en': c['kw_en'],
+                    'education': c.get('edu', td.get('edu', [])),
+                    'certifications': c.get('certs', td.get('certs', [])),
+                    'salary_range': c.get('salary', td.get('salary', '')),
+                    'career_path': c.get('path', td.get('path', '')),
                     'sort_order': c['sort'],
                 }
             )
@@ -311,4 +366,7 @@ class Command(BaseCommand):
                 created += 1
             else:
                 updated += 1
-        self.stdout.write(self.style.SUCCESS(f'{created} created, {updated} updated'))
+        self.stdout.write(self.style.SUCCESS(
+            f'{created} created, {updated} updated. '
+            f'Tree data: {len(TREE_DATA)} categories enriched.'
+        ))

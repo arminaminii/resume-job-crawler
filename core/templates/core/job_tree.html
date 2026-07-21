@@ -1,0 +1,194 @@
+{% extends 'core/base.html' %}
+{% block title %}درخت شغلی | JobFinder{% endblock %}
+
+{% block content %}
+<div class="jf-page-header jf-page-header-sm">
+    <div class="jf-page-header-content">
+        <div>
+            <h1 class="jf-page-title">درخت شغلی</h1>
+            <p class="jf-page-subtitle">نقشه کامل حوزه‌های شغلی، مهارت‌ها، تحصیلات و مسیر پیشرفت</p>
+        </div>
+        <a href="{% url 'home' %}" class="jf-btn jf-btn-ghost">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
+            بازگشت
+        </a>
+    </div>
+</div>
+
+<div class="jf-grid-wide" style="padding-bottom:60px;">
+    <div class="jf-card" style="padding:32px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+            <div>
+                <span style="color:var(--text-secondary);font-size:14px;">{{ total_categories }} حوزه شغلی</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="jf-btn jf-btn-ghost jf-btn-sm" onclick="expandAll()">باز کردن همه</button>
+                <button class="jf-btn jf-btn-ghost jf-btn-sm" onclick="collapseAll()">بستن همه</button>
+            </div>
+        </div>
+
+        <div class="jf-tree">
+            {% for root in roots %}
+            <div class="jf-tree-root">
+                <div class="jf-tree-node jf-tree-root-node" onclick="toggleNode(this)" data-slug="{{ root.slug }}">
+                    <span class="jf-tree-arrow">▶</span>
+                    <span class="jf-tree-icon" style="color:{{ root.color }};">{{ root.icon_svg|safe }}</span>
+                    <span class="jf-tree-name">{{ root.name }}</span>
+                </div>
+                <div class="jf-tree-children">
+                    {% for cat in root.children.all %}
+                    <div class="jf-tree-node" data-slug="{{ cat.slug }}">
+                        <div class="jf-tree-node-header" onclick="toggleNode(this)">
+                            <span class="jf-tree-arrow">▶</span>
+                            <span class="jf-tree-dot" style="background:{{ cat.color }};"></span>
+                            <span class="jf-tree-name">{{ cat.name }}</span>
+                            {% if cat.skills %}
+                            <span class="jf-tree-count">{{ cat.skills|length }} مهارت</span>
+                            {% endif %}
+                        </div>
+                        <div class="jf-tree-detail">
+                            {% if cat.skills %}
+                            <div class="jf-tree-section">
+                                <div class="jf-tree-section-title">مهارت‌های کلیدی</div>
+                                <div class="jf-tree-chips">
+                                    {% for skill in cat.skills|slice:":12" %}
+                                    <span class="jf-chip jf-chip-sm">{{ skill }}</span>
+                                    {% endfor %}
+                                    {% if cat.skills|length > 12 %}
+                                    <span class="jf-chip jf-chip-sm jf-chip-muted">+{{ cat.skills|length|add:"-12" }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cat.positions %}
+                            <div class="jf-tree-section">
+                                <div class="jf-tree-section-title">موقعیت‌های شغلی</div>
+                                <div class="jf-tree-chips">
+                                    {% for pos in cat.positions|slice:":6" %}
+                                    <span class="jf-chip jf-chip-sm" style="background:#f1f5f9;color:#334155;">{{ pos }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cat.education %}
+                            <div class="jf-tree-section">
+                                <div class="jf-tree-section-title">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="vertical-align:middle;margin-left:4px;"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.105V17a1 1 0 001.105 1.105l7-3A1 1 0 0011.394 14.92V3.184a1 1 0 00-1-1.105z"/></svg>
+                                    تحصیلات مورد نیاز
+                                </div>
+                                <div class="jf-tree-tags">
+                                    {% for edu in cat.education %}
+                                    <span class="jf-tree-edu-tag">{{ edu }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cat.certifications %}
+                            <div class="jf-tree-section">
+                                <div class="jf-tree-section-title">گواهینامه‌های پیشنهادی</div>
+                                <div class="jf-tree-tags">
+                                    {% for cert in cat.certifications %}
+                                    <span class="jf-tree-cert-tag">{{ cert }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cat.salary_range %}
+                            <div class="jf-tree-section">
+                                <div class="jf-tree-section-title">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="vertical-align:middle;margin-left:4px;"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/></svg>
+                                    بازه حقوق متوسط
+                                </div>
+                                <span class="jf-tree-salary" style="color:{{ cat.color }};">{{ cat.salary_range }}</span>
+                            </div>
+                            {% endif %}
+                            {% if cat.career_path %}
+                            <div class="jf-tree-section">
+                                <div class="jf-tree-section-title">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="vertical-align:middle;margin-left:4px;"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h4a1 1 0 011 1v4a1 1 0 01-1 1h-1a1 1 0 100-2h.5V8H12zM5 12a1 1 0 100-2h1a1 1 0 011 1v3.5h2.5V12a1 1 0 011-1h1a1 1 0 110 2h-4a1 1 0 01-1-1v-4a1 1 0 011-1h1z" clip-rule="evenodd"/></svg>
+                                    مسیر پیشرفت
+                                </div>
+                                <div class="jf-tree-path">
+                                    {% for step in cat.career_path.split:' >' %}
+                                    <span class="jf-tree-path-step">{{ step.strip }}</span>
+                                    {% if not forloop.last %}<span class="jf-tree-path-arrow">→</span>{% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+.jf-tree { display: flex; flex-direction: column; gap: 8px; }
+.jf-tree-root-node {
+    background: var(--bg-secondary, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    transition: all 0.2s;
+    font-family: Vazirmatn, sans-serif;
+}
+.jf-tree-root-node:hover { border-color: var(--primary, #6366f1); box-shadow: 0 2px 8px rgba(99,102,241,0.1); }
+.jf-tree-children { margin-right: 16px; border-right: 2px solid var(--border-color, #e2e8f0); padding-right: 8px; display: none; flex-direction: column; gap: 6px; }
+.jf-tree-children.open { display: flex; }
+.jf-tree-node { border-radius: 10px; background: #fff; border: 1px solid var(--border-color, #e2e8f0); overflow: hidden; transition: all 0.2s; }
+.jf-tree-node-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s; font-family: Vazirmatn, sans-serif; }
+.jf-tree-node-header:hover { background: var(--bg-secondary, #f8fafc); }
+.jf-tree-arrow { font-size: 10px; color: var(--text-secondary, #94a3b8); transition: transform 0.2s; width: 16px; text-align: center; }
+.jf-tree-arrow.open { transform: rotate(90deg); }
+.jf-tree-icon { width: 24px; height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.jf-tree-icon svg { width: 20px; height: 20px; }
+.jf-tree-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.jf-tree-name { font-weight: 600; font-size: 14px; color: var(--text-primary, #1e293b); font-family: Vazirmatn, sans-serif; }
+.jf-tree-count { font-size: 11px; color: var(--text-secondary, #94a3b8); background: #f1f5f9; padding: 2px 8px; border-radius: 10px; font-family: Vazirmatn, sans-serif; }
+.jf-tree-detail { display: none; padding: 4px 16px 16px; border-top: 1px solid #f1f5f9; }
+.jf-tree-detail.open { display: block; }
+.jf-tree-section { margin-top: 12px; }
+.jf-tree-section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary, #64748b); margin-bottom: 8px; display: flex; align-items: center; font-family: Vazirmatn, sans-serif; }
+.jf-tree-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.jf-tree-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.jf-tree-edu-tag { background: #eff6ff; color: #1d4ed8; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-family: Vazirmatn, sans-serif; }
+.jf-tree-cert-tag { background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-family: Vazirmatn, sans-serif; }
+.jf-tree-salary { font-size: 14px; font-weight: 600; font-family: Vazirmatn, sans-serif; }
+.jf-tree-path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.jf-tree-path-step { background: #f0fdf4; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: Vazirmatn, sans-serif; }
+.jf-tree-path-arrow { color: #94a3b8; font-size: 14px; }
+.jf-grid-wide { max-width: 960px; margin: 0 auto; }
+</style>
+
+<script>
+function toggleNode(header) {
+    const parent = header.closest('.jf-tree-node') || header.closest('.jf-tree-root');
+    const arrow = header.querySelector('.jf-tree-arrow');
+    const detail = parent.querySelector('.jf-tree-detail') || parent.querySelector('.jf-tree-children');
+    if (!detail) return;
+    const isOpen = detail.classList.contains('open');
+    detail.classList.toggle('open');
+    if (arrow) arrow.classList.toggle('open');
+}
+
+function expandAll() {
+    document.querySelectorAll('.jf-tree-children, .jf-tree-detail').forEach(el => el.classList.add('open'));
+    document.querySelectorAll('.jf-tree-arrow').forEach(el => el.classList.add('open'));
+}
+
+function collapseAll() {
+    document.querySelectorAll('.jf-tree-children, .jf-tree-detail').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.jf-tree-arrow').forEach(el => el.classList.remove('open'));
+}
+</script>
+{% endblock %}

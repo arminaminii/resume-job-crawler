@@ -27,6 +27,19 @@ class JobCategory(models.Model):
     # English keywords for matching
     keywords_en = models.JSONField(default=list, blank=True, verbose_name='کلیدواژه‌های انگلیسی')
 
+    # Education requirements for job tree (min education level)
+    # e.g. ['کارشناسی', 'Bachelor', 'لیسانس']
+    education = models.JSONField(default=list, blank=True, verbose_name='تحصیلات مورد نیاز')
+
+    # Certifications / licenses required
+    certifications = models.JSONField(default=list, blank=True, verbose_name='گواهینامه‌ها')
+
+    # Average salary range description
+    salary_range = models.CharField(max_length=200, blank=True, default='', verbose_name='بازه حقوق')
+
+    # Career path / growth potential description
+    career_path = models.CharField(max_length=500, blank=True, default='', verbose_name='مسیر پیشرفت')
+
     is_active = models.BooleanField(default=True)
     sort_order = models.IntegerField(default=0)
 
@@ -37,6 +50,40 @@ class JobCategory(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_sub_categories(self):
+        """Return active child categories."""
+        return self.children.filter(is_active=True)
+
+    def get_full_path(self):
+        """Return full path from root to this category."""
+        path = [self.name]
+        parent = self.parent
+        while parent:
+            path.insert(0, parent.name)
+            parent = parent.parent
+        return ' > '.join(path)
+
+    def get_tree_data(self):
+        """Return dict for tree JSON serialization."""
+        data = {
+            'id': self.id,
+            'name': self.name,
+            'slug': self.slug,
+            'color': self.color,
+            'icon_svg': self.icon_svg,
+            'skills': self.skills or [],
+            'positions': self.positions or [],
+            'education': self.education or [],
+            'certifications': self.certifications or [],
+            'salary_range': self.salary_range,
+            'career_path': self.career_path,
+            'has_children': self.children.filter(is_active=True).exists(),
+            'children': [],
+        }
+        for child in self.children.filter(is_active=True).order_by('sort_order'):
+            data['children'].append(child.get_tree_data())
+        return data
 
     def match_score(self, extracted_skills: list, extracted_text: str = '') -> float:
         """

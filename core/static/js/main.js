@@ -1,5 +1,11 @@
 // JobFinder - Main JS
 
+// Clean up any leftover overlay from previous page loads
+(function cleanOverlay() {
+    var overlay = document.getElementById('searchOverlay');
+    if (overlay) overlay.remove();
+})();
+
 // File Upload Handlers
 const fileInput = document.getElementById('fileInput');
 const dropZone = document.getElementById('dropZone');
@@ -18,39 +24,47 @@ if (fileInput) {
 function handleDragOver(e) {
     e.preventDefault();
     e.stopPropagation();
-    dropZone.classList.add('drag-over');
+    if (dropZone) dropZone.classList.add('drag-over');
 }
 
 function handleDragLeave(e) {
     e.preventDefault();
     e.stopPropagation();
-    dropZone.classList.remove('drag-over');
+    if (dropZone) dropZone.classList.remove('drag-over');
 }
 
 function handleDrop(e) {
     e.preventDefault();
     e.stopPropagation();
-    dropZone.classList.remove('drag-over');
+    if (dropZone) dropZone.classList.remove('drag-over');
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        fileInput.files = files;
+        if (fileInput) fileInput.files = files;
         showFileInfo(files[0].name);
     }
 }
 
+if (dropZone) {
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleDrop);
+}
+
 function showFileInfo(name) {
-    fileName.textContent = name;
-    fileInfo.classList.remove('d-none');
-    uploadBtn.disabled = false;
+    if (fileName) fileName.textContent = name;
+    if (fileInfo) fileInfo.classList.remove('d-none');
+    if (uploadBtn) uploadBtn.disabled = false;
 }
 
 // Upload form submission
 const uploadForm = document.getElementById('uploadForm');
 if (uploadForm) {
     uploadForm.addEventListener('submit', function() {
-        document.getElementById('loadingCard').classList.remove('d-none');
-        this.closest('.jf-grid-center').style.display = 'none';
+        var lc = document.getElementById('loadingCard');
+        if (lc) lc.classList.remove('d-none');
+        var grid = this.closest('.jf-grid-center');
+        if (grid) grid.style.display = 'none';
     });
 }
 
@@ -59,15 +73,16 @@ if (uploadForm) {
 const searchForm = document.getElementById('searchForm');
 if (searchForm) {
     searchForm.addEventListener('submit', function() {
-        const btn = document.getElementById('searchBtn');
+        var btn = document.getElementById('searchBtn');
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="jf-spinner" style="width:18px;height:18px;border-width:2px;display:inline-block;vertical-align:middle;margin-left:8px;"></span> در حال جستجو...';
         }
         // Show overlay after a short delay (gives form time to actually submit)
         setTimeout(function() {
-            if (btn && btn.disabled) {
-                let overlay = document.getElementById('searchOverlay');
+            // Only show overlay if we're still on the same page (form didn't navigate)
+            if (btn && btn.disabled && btn.form) {
+                var overlay = document.getElementById('searchOverlay');
                 if (!overlay) {
                     overlay = document.createElement('div');
                     overlay.id = 'searchOverlay';

@@ -13,4 +13,6 @@ urlpatterns = [
     path('delete-resume/<int:resume_id>/', views.delete_resume, name='delete_resume'),
     path('history/', views.search_history, name='search_history'),
     path('api/suggest-categories/<int:resume_id>/', views.suggest_categories_api, name='suggest_categories_api'),
+    path('job-tree/', views.job_tree, name='job_tree'),
+    path('api/job-tree/', views.job_tree_api, name='job_tree_api'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
