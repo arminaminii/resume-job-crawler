@@ -159,9 +159,20 @@ def search_config(request, resume_id):
 
     if request.method == 'POST':
         form = SearchConfigForm(request.POST)
+        
+        # Validate that at least one category is selected
+        selected_cats = request.POST.getlist('categories')
+        if not selected_cats:
+            messages.warning(request, 'لطفاً حداقل یک حوزه شغلی انتخاب کنید.')
+            return render(request, 'core/search_config.html', {
+                'resume': resume, 'form': form,
+                'suggested_keywords': suggested_keywords,
+                'suggested_categories': suggested_categories,
+                'all_categories': all_categories,
+                'preselected_slugs': preselected_slugs,
+            })
+        
         if form.is_valid():
-            # Get selected categories from POST data
-            selected_cats = request.POST.getlist('categories')
 
             # Build keywords from selected categories + custom input
             cat_keywords = _build_category_keywords(selected_cats)

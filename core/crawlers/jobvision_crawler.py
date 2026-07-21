@@ -91,8 +91,10 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
 
     # Build filters
     filters = {}
-    if keywords.strip():
-        filters['keyword'] = keywords.strip()
+    # Truncate keywords to prevent API issues (max ~200 chars)
+    clean_keywords = ' '.join(keywords.strip().split()[:10]) if keywords.strip() else ''
+    if clean_keywords:
+        filters['keyword'] = clean_keywords
 
     # Use category slugs for Jobvision's categorySlug filter
     if category_slugs:
@@ -106,7 +108,18 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
     if level != 'all' and level in LEVEL_MAP:
         filters['seniorityLevelIds'] = [LEVEL_MAP[level]]
 
-    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', city={city}, level={level}, categories={category_slugs}")
+    # Time range filter (days ago)
+    if time_range and time_range != 'all':
+        try:
+            from datetime import datetime, timedelta
+            days = int(time_range)
+            cutoff = datetime.now() - timedelta(days=days)
+            # Jobvision expects Unix timestamp in milliseconds
+            filters['publishedDateGte'] = int(cutoff.timestamp() * 1000)
+        except (ValueError, TypeError):
+            pass
+
+    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', city={city}, level={level}, categories={category_slugs}, time_range={time_range}")
 
     for page in range(1, max_pages + 1):
         try:

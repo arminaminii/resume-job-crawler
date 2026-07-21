@@ -213,7 +213,16 @@
             </svg>
             <h3 class="jf-empty-title">نتیجه‌ای یافت نشد</h3>
             <p class="jf-empty-text">
-                {% if keyword_filter or platform_filter or city_filter %}
+                {% if search.status == 'completed' and search.total_results == 0 %}
+                آگهی استخدامی با این معیارها یافت نشد. 
+                پیشنهادات:
+                <ul style="text-align:right; margin-top:12px; padding-right:20px; color:var(--text-secondary); font-size:14px; line-height:2;">
+                    <li>حوزه‌های شغلی بیشتری انتخاب کنید</li>
+                    <li>کلمات کلیدی ساده‌تر وارد کنید (مثلاً: Python)</li>
+                    <li>فیلتر زمان را افزایش دهید (مثلاً ۳۰ روز)</li>
+                    <li>شهر را حذف کنید تا نتایج بیشتری یافت شود</li>
+                </ul>
+                {% elif keyword_filter or platform_filter or city_filter %}
                 فیلترهای خود را تغییر دهید یا
                 <a href="{% url 'search_results' search.id %}">فیلترها را حذف کنید</a>
                 {% else %}
