@@ -93,10 +93,10 @@
                 <div class="jf-category-grid" id="categoryGrid">
                     {% for cat in all_categories %}
                     {% if cat.slug != 'other' %}
-                    <label class="jf-category-card {% if cat.slug in preselected_slugs %}checked{% endif %}"
+                    <label class="jf-category-card {% if cat.slug in selected_cats_post %}checked{% endif %}"
                            data-slug="{{ cat.slug }}" data-color="{{ cat.color }}"
                            data-suggested="{% for scat, sscore in suggested_categories %}{% if scat.slug == cat.slug %}1{% endif %}{% endfor %}">
-                        <input type="checkbox" name="categories" value="{{ cat.slug }}" class="jf-cat-input" {% if cat.slug in preselected_slugs %}checked{% endif %}>
+                        <input type="checkbox" name="categories" value="{{ cat.slug }}" class="jf-cat-input" {% if cat.slug in selected_cats_post %}checked{% endif %}>
                         <div class="jf-category-icon" style="color: {{ cat.color }}; background: {{ cat.color }}15;">
                             {{ cat.icon_svg|safe }}
                         </div>
@@ -139,8 +139,8 @@
                 </div>
                 <div class="jf-platforms">
                     {% for choice in form.platforms.field.choices %}
-                    <label class="jf-platform-card {% if choice.0 in form.platforms.initial %}checked{% endif %}" id="pc-{{ choice.0 }}">
-                        <input type="checkbox" name="platforms" value="{{ choice.0 }}" class="jf-platform-input" {% if choice.0 in form.platforms.initial %}checked{% endif %}>
+                    <label class="jf-platform-card {% if choice.0 in selected_platforms %}checked{% endif %}" id="pc-{{ choice.0 }}">
+                        <input type="checkbox" name="platforms" value="{{ choice.0 }}" class="jf-platform-input" {% if choice.0 in selected_platforms %}checked{% endif %}>
                         <div class="jf-platform-icon">
                             {% if choice.0 == 'jobvision' %}
                             <svg viewBox="0 0 24 24" fill="none" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="4" stroke="#6366f1" stroke-width="2"/><path d="M8 12h8M12 8v8" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/></svg>

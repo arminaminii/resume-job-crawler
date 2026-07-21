@@ -162,6 +162,15 @@ def search_config(request, resume_id):
     # Get all active categories for the grid
     all_categories = JobCategory.objects.filter(is_active=True).order_by('sort_order', 'name')
 
+    # Determine which platforms/categories are visually checked
+    if request.method == 'POST':
+        selected_platforms = request.POST.getlist('platforms')
+        selected_cats_post = request.POST.getlist('categories')
+    else:
+        # GET: use form initial + AI suggestions
+        selected_platforms = form.platforms.initial if hasattr(form, 'platforms') else ['jobvision']
+        selected_cats_post = preselected_slugs
+
     if request.method == 'POST':
         form = SearchConfigForm(request.POST)
 
@@ -181,6 +190,8 @@ def search_config(request, resume_id):
                 'suggested_categories': suggested_categories,
                 'all_categories': all_categories,
                 'preselected_slugs': preselected_slugs,
+                'selected_platforms': selected_platforms,
+                'selected_cats_post': selected_cats_post,
             })
 
         if form.is_valid():
@@ -241,6 +252,8 @@ def search_config(request, resume_id):
         'suggested_categories': suggested_categories,
         'all_categories': all_categories,
         'preselected_slugs': preselected_slugs,
+        'selected_platforms': selected_platforms,
+        'selected_cats_post': selected_cats_post,
     })
 
 

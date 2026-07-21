@@ -555,6 +555,10 @@ body {
     transition: var(--jf-transition);
     border-right: 3px solid var(--jf-primary);
 }
+/* Platform-specific card accent colors */
+.jf-job-card[data-platform="jobvision"] { border-right-color: #6366f1; }
+.jf-job-card[data-platform="e_estekhdam"] { border-right-color: #10b981; }
+.jf-job-card[data-platform="irantalent"] { border-right-color: #f59e0b; }
 .jf-job-card:hover { box-shadow: var(--jf-shadow-lg); transform: translateY(-1px); }
 
 .jf-job-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }

@@ -124,7 +124,7 @@
         </div>
 
         {% for job in listings %}
-        <div class="jf-job-card">
+        <div class="jf-job-card" data-platform="{{ job.platform }}">
             <div class="jf-job-card-top">
                 <div class="jf-job-card-badges">
                     <span class="jf-badge jf-badge-{{ job.platform }}">
