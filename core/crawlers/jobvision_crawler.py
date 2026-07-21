@@ -1,13 +1,27 @@
+"""
+Jobvision crawler — uses their REST API.
+
+API endpoint: POST https://candidateapi.jobvision.ir/api/v1/JobPost/List
+Returns JSON with jobPosts array.
+
+IMPORTANT: The API may not reliably apply filters (categorySlugs, keyword)
+due to CDN caching when accessed from outside Iran. This crawler includes
+client-side filtering as a safety net.
+
+From Iran (user's machine), the API filters DO work correctly.
+"""
 import requests
 import time
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 LIST_API = "https://candidateapi.jobvision.ir/api/v1/JobPost/List"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "application/json",
     "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7",
     "Origin": "https://jobvision.ir",
@@ -50,39 +64,89 @@ PROVINCE_SLUGS = {
 }
 
 LEVEL_MAP = {
-    'junior': 2,   # کارآموز / جونیور
-    'mid': 3,      # متوسط
-    'senior': 4,   # ارشد / سنیور
-    'manager': 5,  # مدیریتی
+    'junior': 2,
+    'mid': 3,
+    'senior': 4,
+    'manager': 5,
     'all': 0,
 }
 
-# Timeout
-API_TIMEOUT = 20   # seconds per API call
+API_TIMEOUT = 20
 
 session = requests.Session()
 session.headers.update(HEADERS)
 
 
-def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
-                    time_range: str = '7', max_pages: int = 2,
+def _job_matches_filters(job: dict, keywords: str, level: str) -> bool:
+    """
+    Client-side filter: check if a job matches search criteria.
+    Used as fallback when API filters don't work (e.g., CDN caching).
+    """
+    # Build searchable text from the job
+    parts = [
+        job.get('title', ''),
+        (job.get('company') or {}).get('nameFa', '') or '',
+        (job.get('company') or {}).get('nameEn', '') or '',
+    ]
+    # Add skills
+    for s in (job.get('skills') or []):
+        if isinstance(s, dict):
+            parts.append(s.get('titleFa', '') or s.get('titleEn', ''))
+        elif isinstance(s, str):
+            parts.append(s)
+    # Add category names
+    for c in (job.get('jobCategories') or []):
+        parts.append(c.get('titleFa', '') or c.get('titleEn', ''))
+
+    full_text = ' '.join(parts).lower()
+
+    # Keyword matching: at least one keyword must match
+    if keywords and keywords.strip():
+        kw_list = [kw.strip().lower() for kw in keywords.split() if kw.strip()]
+        if kw_list:
+            if not any(kw in full_text for kw in kw_list):
+                return False
+
+    # Level filtering
+    if level and level != 'all':
+        seniority = job.get('seniorityLevel') or {}
+        level_title = (seniority.get('titleFa', '') or seniority.get('titleEn', '')).lower()
+        level_id = seniority.get('id', 0)
+
+        level_map = {
+            'junior': [2, 'کارآموز', 'جونیور', 'مبتدی'],
+            'mid': [3, 'متوسط', 'میان‌رده'],
+            'senior': [4, 'ارشد', 'سنیور', 'senior'],
+            'manager': [5, 'مدیر', 'manager', 'مدیریتی'],
+        }
+        match_criteria = level_map.get(level, [])
+        id_match = any(isinstance(c, int) and c == level_id for c in match_criteria)
+        text_match = any(isinstance(c, str) and c in level_title for c in match_criteria)
+        if not id_match and not text_match:
+            return False
+
+    return True
+
+
+def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
+                    time_range: str = '7', max_pages: int = 3,
                     category_slugs: list = None) -> list:
     """
     Crawl Jobvision for job listings via REST API.
     Returns list of dicts with job data.
+
     category_slugs: list of Jobvision category slugs from JobCategory.jobvision_slug
     """
     results = []
     seen_ids = set()
 
-    # Build filters
+    # Build API filters
     filters = {}
-    # Truncate keywords to prevent API issues (max ~200 chars)
     clean_keywords = ' '.join(keywords.strip().split()[:10]) if keywords.strip() else ''
     if clean_keywords:
         filters['keyword'] = clean_keywords
 
-    # Use category slugs for Jobvision's categorySlug filter
+    # Try category slugs (may not work from all IPs due to CDN)
     if category_slugs:
         unique_slugs = list(set(s for s in category_slugs if s))
         if unique_slugs:
@@ -94,27 +158,30 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
     if level != 'all' and level in LEVEL_MAP:
         filters['seniorityLevelIds'] = [LEVEL_MAP[level]]
 
-    # Time range filter (days ago)
+    # Time range filter
     if time_range and time_range != 'all':
         try:
             from datetime import datetime, timedelta
             days = int(time_range)
             cutoff = datetime.now() - timedelta(days=days)
-            # Jobvision expects Unix timestamp in milliseconds
             filters['publishedDateGte'] = int(cutoff.timestamp() * 1000)
         except (ValueError, TypeError):
             pass
 
-    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', "
+    logger.info(f"Jobvision: keywords='{keywords.strip()[:50]}', "
                 f"city={city}, level={level}, categories={category_slugs}, "
-                f"time_range={time_range}, filters={list(filters.keys())}")
+                f"filters={list(filters.keys())}")
 
-    for page in range(1, max_pages + 1):
+    # We request more pages and do client-side filtering to compensate
+    # for potential API filter issues
+    api_pages = max_pages + 1  # Fetch one extra page for filtering
+
+    for page in range(1, api_pages + 1):
         try:
             payload = {
                 "page": page,
                 "pageSize": 20,
-                "sort": 0,
+                "sort": 1,  # Sort by newest (1=newest, 0=relevance)
                 "filters": filters,
             }
             resp = session.post(LIST_API, json=payload, timeout=API_TIMEOUT)
@@ -126,30 +193,43 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                 break
 
             job_posts = data.get('data', {}).get('jobPosts', [])
+            total_count = data.get('data', {}).get('jobPostCount', 0)
+            if page == 1:
+                logger.info(f"Jobvision: total {total_count} jobs available on platform")
+
             if not job_posts:
                 logger.info(f"Jobvision: no more jobs at page {page}")
                 break
 
+            page_matches = 0
             for job in job_posts:
                 job_id = job.get('id')
                 if job_id in seen_ids:
                     continue
                 seen_ids.add(job_id)
 
-                # Title is a DIRECT STRING (not an object)
+                # Client-side filtering (safety net for API filter issues)
+                if not _job_matches_filters(job, keywords, level):
+                    continue
+
+                page_matches += 1
+
+                # --- Extract data from API response ---
+
                 title = job.get('title', '')
 
                 # Company info
                 company_info = job.get('company', {}) or {}
-                company = company_info.get('nameFa', '') or company_info.get('nameEn', '')
+                company = (company_info.get('nameFa', '') or
+                          company_info.get('nameEn', '') or '')
 
-                # Location info - city and province are nested objects
+                # Location info
                 location_info = job.get('location', {}) or {}
-                city_obj = (location_info.get('city', {}) or {})
-                province_obj = (location_info.get('province', {}) or {})
+                city_obj = location_info.get('city', {}) or {}
+                province_obj = location_info.get('province', {}) or {}
                 city_name = (city_obj.get('titleFa', '') or
-                              city_obj.get('name', '') or
-                              province_obj.get('titleFa', ''))
+                            city_obj.get('name', '') or
+                            province_obj.get('titleFa', ''))
 
                 # Salary info
                 salary_info = job.get('salary', {}) or {}
@@ -162,11 +242,13 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
 
                 # Work type
                 work_type_info = job.get('workType', {}) or {}
-                work_type = work_type_info.get('titleFa', '') or work_type_info.get('titleEn', '')
+                work_type = (work_type_info.get('titleFa', '') or
+                            work_type_info.get('titleEn', ''))
 
                 # Seniority level
                 seniority_info = job.get('seniorityLevel', {}) or {}
-                seniority = seniority_info.get('titleFa', '') or seniority_info.get('titleEn', '')
+                seniority = (seniority_info.get('titleFa', '') or
+                            seniority_info.get('titleEn', ''))
 
                 # Skills
                 skills_raw = job.get('skills', []) or []
@@ -177,6 +259,14 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     elif isinstance(s, str):
                         skills.append(s)
 
+                # Job categories (for context)
+                categories_raw = job.get('jobCategories', []) or []
+                cat_names = []
+                for c in categories_raw:
+                    name = c.get('titleFa', '') or c.get('titleEn', '')
+                    if name:
+                        cat_names.append(name)
+
                 # Remote status
                 properties = job.get('properties', {}) or {}
                 is_remote = properties.get('isRemote', False)
@@ -185,10 +275,31 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                 activation = job.get('activationTime', {}) or {}
                 posted_date = activation.get('beautifyFa', '') or ''
 
-                # Province name for display
-                province_name = province_obj.get('titleFa', '') or province_obj.get('name', '')
+                # Province name
+                province_name = (province_obj.get('titleFa', '') or
+                                province_obj.get('name', ''))
+
+                # Benefits
+                benefits_raw = job.get('benefits', []) or []
+                benefits = []
+                for b in benefits_raw:
+                    if isinstance(b, dict):
+                        benefits.append(b.get('titleFa', '') or b.get('titleEn', ''))
+                    elif isinstance(b, str):
+                        benefits.append(b)
 
                 url = f"https://jobvision.ir/jobs/{job_id}"
+
+                # Build description
+                desc_parts = []
+                if cat_names:
+                    desc_parts.append(f"دسته: {', '.join(cat_names)}")
+                if benefits:
+                    desc_parts.append(f"مزایا: {', '.join(benefits[:5])}")
+                description = ' | '.join(desc_parts)
+
+                # All skills including benefits
+                all_skills = skills + benefits
 
                 results.append({
                     'platform': 'jobvision',
@@ -199,15 +310,24 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     'salary': salary,
                     'job_type': work_type,
                     'seniority_level': seniority,
-                    'description': '',
-                    'skills': skills,
+                    'description': description,
+                    'skills': all_skills,
                     'url': url,
                     'remote': is_remote,
                     'posted_date': posted_date,
                 })
 
-            logger.info(f"Jobvision page {page}: got {len(job_posts)} jobs (total so far: {len(results)})")
+                # Stop if we have enough results
+                if len(results) >= max_pages * 20:
+                    break
+
+            logger.info(f"Jobvision page {page}: {len(job_posts)} API jobs, "
+                        f"{page_matches} matched filters "
+                        f"(total so far: {len(results)})")
             time.sleep(0.5)
+
+            if len(results) >= max_pages * 20:
+                break
 
         except requests.Timeout:
             logger.error(f"Jobvision API timeout at page {page}")
@@ -215,12 +335,9 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
         except requests.ConnectionError as e:
             logger.error(f"Jobvision connection error at page {page}: {e}")
             break
-        except requests.RequestException as e:
-            logger.error(f"Jobvision crawl error page {page}: {e}")
-            break
         except Exception as e:
-            logger.error(f"Jobvision unexpected error page {page}: {e}")
+            logger.error(f"Jobvision error at page {page}: {e}")
             break
 
-    logger.info(f"Jobvision total: {len(results)} jobs")
+    logger.info(f"Jobvision total: {len(results)} jobs (after client-side filtering)")
     return results
