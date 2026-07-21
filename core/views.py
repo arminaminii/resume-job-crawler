@@ -1,5 +1,7 @@
 import json
 import logging
+import traceback
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.conf import settings
@@ -11,6 +13,9 @@ from .services.ocr_service import extract_resume_text
 from .services.bert_classifier import classify_resume, suggest_search_keywords
 
 logger = logging.getLogger(__name__)
+
+# Max seconds each crawler is allowed to run before we kill it
+CRAWLER_TIMEOUT_SECONDS = 45
 
 
 def home(request):
@@ -159,7 +164,13 @@ def search_config(request, resume_id):
 
     if request.method == 'POST':
         form = SearchConfigForm(request.POST)
-        
+
+        # DEBUG: log what we received
+        logger.info(f"Search POST: platforms={request.POST.getlist('platforms')}, "
+                     f"categories={request.POST.getlist('categories')}, "
+                     f"city={request.POST.get('city', '')}, "
+                     f"level={request.POST.get('level', '')}")
+
         # Validate that at least one category is selected
         selected_cats = request.POST.getlist('categories')
         if not selected_cats:
@@ -171,9 +182,8 @@ def search_config(request, resume_id):
                 'all_categories': all_categories,
                 'preselected_slugs': preselected_slugs,
             })
-        
-        if form.is_valid():
 
+        if form.is_valid():
             # Build keywords from selected categories + custom input
             cat_keywords = _build_category_keywords(selected_cats)
             custom_kw = form.cleaned_data.get('custom_keywords', '')
@@ -189,32 +199,38 @@ def search_config(request, resume_id):
                 status='running',
             )
 
-            # Run crawling
+            # Run crawling (with per-crawler timeout protection)
             try:
                 crawler_messages = _run_search(search, cat_keywords, suggested_keywords)
                 search.status = 'completed'
 
                 for msg in crawler_messages:
-                    if 'error' in msg.lower() or 'not available' in msg.lower():
+                    if 'خطا' in msg or 'not available' in msg.lower() or 'timeout' in msg.lower() or 'زمان' in msg:
                         messages.warning(request, msg)
                     else:
-                        messages.info(request, msg)
+                        messages.success(request, msg)
 
                 if not search.total_results:
                     messages.info(
                         request,
-                        'نتیجه‌ای یافت نشد. عبارت جستجو را تغییر دهید '
-                        'یا فقط جاب‌ویژن را انتخاب کنید.'
+                        'نتیجه‌ای یافت نشد. لطفاً حوزه‌های شغلی بیشتری انتخاب کنید '
+                        'یا کلمات کلیدی را تغییر دهید.'
                     )
             except Exception as e:
                 search.status = 'failed'
                 search.error_message = str(e)
-                logger.error(f"Search {search.id} failed: {e}", exc_info=True)
+                logger.error(f"Search {search.id} failed: {e}\n{traceback.format_exc()}")
                 messages.error(request, f'خطا در جستجو: {str(e)[:200]}')
             finally:
                 search.save()
 
             return redirect('search_results', search_id=search.id)
+        else:
+            # Form validation failed - show errors to user
+            logger.warning(f"Form validation failed: {form.errors}")
+            for field, errs in form.errors.items():
+                for err in errs:
+                    messages.error(request, f'{field}: {err}')
     else:
         form = SearchConfigForm()
 
@@ -255,10 +271,32 @@ def _build_category_keywords(selected_slugs: list) -> str:
     return ' '.join(result)
 
 
+def _run_crawler_safe(crawler_func, crawler_name, **kwargs) -> tuple:
+    """
+    Run a crawler with a hard timeout so one slow platform can't block others.
+    Returns (results_list, status_message_string).
+    """
+    logger.info(f"[{crawler_name}] Starting crawl (timeout={CRAWLER_TIMEOUT_SECONDS}s)...")
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(crawler_func, **kwargs)
+            try:
+                results = future.result(timeout=CRAWLER_TIMEOUT_SECONDS)
+                msg = f'{crawler_name}: {len(results)} آگهی یافت شد'
+                logger.info(f"[{crawler_name}] Done: {len(results)} results")
+                return results, msg
+            except FuturesTimeoutError:
+                logger.warning(f"[{crawler_name}] TIMED OUT after {CRAWLER_TIMEOUT_SECONDS}s")
+                return [], f'{crawler_name}: زمان بر ای پلتفرم به پایان رسید. دوباره تلاش کنید یا فقط جاب‌ویژن را انتخاب کنید.'
+    except Exception as e:
+        logger.error(f"[{crawler_name}] Exception: {e}", exc_info=True)
+        return [], f'{crawler_name}: خطا - {str(e)[:80]}'
+
+
 def _run_search(search: JobSearch, category_keywords: str, auto_keywords: str) -> list:
     """
     Execute the job search across all selected platforms.
-    Each crawler is isolated - one failure won't block others.
+    Each crawler runs with a hard timeout so one failure doesn't block others.
     Returns list of status messages to show to user.
     """
     # Build final keywords: category-based + custom + auto from resume
@@ -271,85 +309,67 @@ def _run_search(search: JobSearch, category_keywords: str, auto_keywords: str) -
         keywords_parts.append(auto_keywords)
     keywords = ' '.join(keywords_parts)
 
+    logger.info(f"Running search #{search.id}: platforms={search.platforms}, "
+                f"keywords='{keywords[:80]}', city={search.city}")
+
     all_results = []
     status_messages = []
 
     # Get selected categories for platform-specific slug mapping
     selected_cats = search.selected_categories or []
-    jobvision_cats = JobCategory.objects.filter(
+    jobvision_cats = list(JobCategory.objects.filter(
         slug__in=selected_cats, is_active=True
-    ).values_list('jobvision_slug', flat=True).distinct()
+    ).values_list('jobvision_slug', flat=True).distinct())
+    # Filter out empty slugs
+    jobvision_cats = [s for s in jobvision_cats if s]
 
-    # --- Jobvision (requests-based, no Playwright needed) ---
+    # --- Jobvision (requests-based, fast REST API) ---
     if 'jobvision' in search.platforms:
-        try:
-            from .crawlers.jobvision_crawler import crawl_jobvision
-            logger.info("Starting Jobvision crawl...")
-            results = crawl_jobvision(
-                keywords=keywords,
-                city=search.city,
-                level=search.level,
-                time_range=search.time_range,
-                max_pages=3,
-                category_slugs=list(jobvision_cats),
-            )
-            all_results.extend(results)
-            status_messages.append(f'جاب‌ویژن: {len(results)} آگهی یافت شد')
-            logger.info(f"Jobvision: {len(results)} results")
-        except Exception as e:
-            msg = f'جاب‌ویژن: خطا - {str(e)[:100]}'
-            status_messages.append(msg)
-            logger.error(f"Jobvision crawl failed: {e}", exc_info=True)
+        from .crawlers.jobvision_crawler import crawl_jobvision
+        results, msg = _run_crawler_safe(
+            crawl_jobvision, 'جاب‌ویژن',
+            keywords=keywords,
+            city=search.city,
+            level=search.level,
+            time_range=search.time_range,
+            max_pages=2,
+            category_slugs=jobvision_cats,
+        )
+        all_results.extend(results)
+        status_messages.append(msg)
 
     # --- E-estekhdam (BS4 + optional Playwright fallback) ---
     if 'e_estekhdam' in search.platforms:
-        try:
-            from .crawlers.estekhdam_crawler import crawl_estekhdam
-            logger.info("Starting E-estekhdam crawl...")
-            results = crawl_estekhdam(
-                keywords=keywords,
-                city=search.city,
-                level=search.level,
-                time_range=search.time_range,
-                max_pages=3,
-            )
-            all_results.extend(results)
-            status_messages.append(f'ای‌استخدام: {len(results)} آگهی یافت شد')
-            logger.info(f"E-estekhdam: {len(results)} results")
-        except Exception as e:
-            msg = f'ای‌استخدام: خطا - {str(e)[:100]}'
-            status_messages.append(msg)
-            logger.error(f"E-estekhdam crawl failed: {e}", exc_info=True)
+        from .crawlers.estekhdam_crawler import crawl_estekhdam
+        results, msg = _run_crawler_safe(
+            crawl_estekhdam, 'ای‌استخدام',
+            keywords=keywords,
+            city=search.city,
+            level=search.level,
+            time_range=search.time_range,
+            max_pages=2,
+        )
+        all_results.extend(results)
+        status_messages.append(msg)
 
-    # --- IranTalent (Playwright-only, Angular SPA) ---
+    # --- IranTalent (API + Playwright fallback) ---
     if 'irantalent' in search.platforms:
-        try:
-            from .crawlers.irantalent_crawler import crawl_irantalent
-            logger.info("Starting IranTalent crawl...")
-            results = crawl_irantalent(
-                keywords=keywords,
-                city=search.city,
-                level=search.level,
-                time_range=search.time_range,
-                max_pages=3,
-            )
-            all_results.extend(results)
-            if results:
-                status_messages.append(f'ایران‌تلنت: {len(results)} آگهی یافت شد')
-            else:
-                status_messages.append(
-                    'ایران‌تلنت: نتایجی یافت نشد. '
-                    'این پلتفرم به Playwright/Chromium نیاز دارد. '
-                    'با VPN دستور playwright install chromium را اجرا کنید.'
-                )
-            logger.info(f"IranTalent: {len(results)} results")
-        except Exception as e:
-            msg = f'ایران‌تلنت: خطا - {str(e)[:100]}'
-            status_messages.append(msg)
-            logger.error(f"IranTalent crawl failed: {e}", exc_info=True)
+        from .crawlers.irantalent_crawler import crawl_irantalent
+        results, msg = _run_crawler_safe(
+            crawl_irantalent, 'ایران‌تلنت',
+            keywords=keywords,
+            city=search.city,
+            level=search.level,
+            time_range=search.time_range,
+            max_pages=2,
+        )
+        all_results.extend(results)
+        status_messages.append(msg)
 
     # Save to DB
     search.total_results = len(all_results)
+    logger.info(f"Search #{search.id}: total {len(all_results)} results from all platforms")
+
     for data in all_results:
         JobListing.objects.create(
             search=search,

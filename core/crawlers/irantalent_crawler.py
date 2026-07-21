@@ -44,9 +44,13 @@ HEADERS = {
     "Origin": "https://www.irantalent.com",
 }
 
+# Single API endpoint to try (the most likely one)
+_API_ENDPOINTS = [
+    f'{API_BASE}/job/search',
+]
 
 def crawl_irantalent(keywords: str, city: str = '', level: str = 'all',
-                       time_range: str = '7', max_pages: int = 3) -> list:
+                       time_range: str = '7', max_pages: int = 2) -> list:
     """
     Crawl IranTalent.
     Strategy:
@@ -71,188 +75,150 @@ def _crawl_via_api(keywords, city, level, time_range, max_pages):
     session = requests.Session()
     session.headers.update(HEADERS)
 
-    # Try common API endpoints used by Angular frontend
-    api_endpoints = [
-        # Endpoint 1: job search API
-        {
-            'url': f'{API_BASE}/job/search',
-            'method': 'POST',
-            'params': None,
-        },
-        # Endpoint 2: jobs list
-        {
-            'url': f'{API_BASE}/jobs',
-            'method': 'GET',
-            'params': None,
-        },
-        # Endpoint 3: v2 search
-        {
-            'url': f'{API_BASE}/v2/jobs/search',
-            'method': 'POST',
-            'params': None,
-        },
-    ]
-
-    for page in range(1, max_pages + 1):
-        found_any = False
-
-        for endpoint in api_endpoints:
-            try:
-                payload = {
-                    'keyword': keywords.strip() if keywords else '',
-                    'location': CITY_SLUGS.get(city, '') if city else '',
-                    'seniority': SENIORITY_SLUGS.get(level, '') if level != 'all' else '',
-                    'page': page,
-                    'limit': 20,
-                }
-
-                if endpoint['method'] == 'POST':
-                    resp = session.post(
-                        endpoint['url'],
-                        json=payload,
-                        timeout=15,
-                        headers={**HEADERS, 'Content-Type': 'application/json'},
-                    )
-                else:
-                    resp = session.get(
-                        endpoint['url'],
-                        params=payload,
-                        timeout=15,
-                    )
-
-                if resp.status_code == 404:
-                    continue
-
-                if resp.status_code == 403:
-                    logger.warning(f"IranTalent API {endpoint['url']}: 403 forbidden")
-                    continue
-
-                if not resp.ok:
-                    logger.debug(f"IranTalent API {endpoint['url']}: HTTP {resp.status_code}")
-                    continue
-
-                # Try to parse JSON
+    # Try each API endpoint until one works
+    working_endpoint = None
+    for endpoint in _API_ENDPOINTS:
+        try:
+            payload = {
+                'keyword': (keywords.strip() if keywords else ''),
+                'location': CITY_SLUGS.get(city, '') if city else '',
+                'seniority': SENIORITY_SLUGS.get(level, '') if level != 'all' else '',
+                'page': 1,
+                'limit': 20,
+            }
+            resp = session.post(
+                endpoint,
+                json=payload,
+                timeout=10,
+                headers={**HEADERS, 'Content-Type': 'application/json'},
+            )
+            if resp.status_code == 200:
                 try:
                     data = resp.json()
+                    if data and (data.get('data') or data.get('items') or data.get('jobs') or data.get('results')):
+                        working_endpoint = endpoint
+                        logger.info(f"IranTalent: Working API endpoint found: {endpoint}")
+                        break
                 except (json.JSONDecodeError, ValueError):
-                    logger.debug(f"IranTalent API: not JSON response")
+                    continue
+            elif resp.status_code == 403:
+                logger.warning(f"IranTalent API {endpoint}: 403 forbidden")
+                break
+        except (requests.Timeout, requests.ConnectionError) as e:
+            logger.debug(f"IranTalent API connection issue: {e}")
+            continue
+        except Exception as e:
+            logger.debug(f"IranTalent API error: {e}")
+            continue
+
+    if not working_endpoint:
+        logger.info("IranTalent: No working API endpoint found")
+        return []
+
+    # Now crawl pages using the working endpoint
+    for page in range(1, max_pages + 1):
+        try:
+            payload = {
+                'keyword': (keywords.strip() if keywords else ''),
+                'location': CITY_SLUGS.get(city, '') if city else '',
+                'seniority': SENIORITY_SLUGS.get(level, '') if level != 'all' else '',
+                'page': page,
+                'limit': 20,
+            }
+            resp = session.post(
+                working_endpoint,
+                json=payload,
+                timeout=10,
+                headers={**HEADERS, 'Content-Type': 'application/json'},
+            )
+
+            if not resp.ok:
+                break
+
+            data = resp.json()
+            jobs = (
+                data.get('data', {}).get('items', []) or
+                data.get('data', {}).get('jobs', []) or
+                data.get('items', []) or
+                data.get('jobs', []) or
+                data.get('results', []) or
+                (data.get('data', []) if isinstance(data.get('data'), list) else [])
+            )
+
+            if not jobs:
+                break
+
+            for job in jobs:
+                if not isinstance(job, dict):
                     continue
 
-                # Extract jobs from various possible response structures
-                jobs = []
-                if isinstance(data, dict):
-                    jobs = (
-                        data.get('data', {}).get('items', []) or
-                        data.get('data', {}).get('jobs', []) or
-                        data.get('items', []) or
-                        data.get('jobs', []) or
-                        data.get('results', []) or
-                        (data.get('data', []) if isinstance(data.get('data'), list) else [])
-                    )
-                elif isinstance(data, list):
-                    jobs = data
+                title = (job.get('title', '') or job.get('jobTitle', '') or job.get('name', '') or '')
 
-                if not jobs:
-                    continue
+                company_info = job.get('company', {}) or {}
+                if isinstance(company_info, dict):
+                    company = company_info.get('name', '') or company_info.get('title', '') or ''
+                else:
+                    company = str(company_info)
 
-                found_any = True
-                for job in jobs:
-                    if not isinstance(job, dict):
-                        continue
+                loc_info = job.get('location', {}) or {}
+                if isinstance(loc_info, dict):
+                    city_name = loc_info.get('city', '') or loc_info.get('name', '') or (city or '')
+                else:
+                    city_name = str(loc_info) if loc_info else (city or '')
 
-                    title = (
-                        job.get('title', '') or
-                        job.get('jobTitle', '') or
-                        job.get('name', '') or
-                        ''
-                    )
+                salary = ''
+                salary_info = job.get('salary', {})
+                if isinstance(salary_info, dict):
+                    min_s = salary_info.get('min', '')
+                    max_s = salary_info.get('max', '')
+                    if min_s or max_s:
+                        salary = f"{min_s} - {max_s}"
 
-                    company_info = job.get('company', {}) or {}
-                    if isinstance(company_info, dict):
-                        company = company_info.get('name', '') or company_info.get('title', '') or ''
-                    else:
-                        company = str(company_info)
+                seniority = (job.get('seniorityLevel', '') or job.get('seniority', '') or
+                             job.get('level', '') or '')
+                if isinstance(seniority, dict):
+                    seniority = seniority.get('title', '') or seniority.get('name', '')
 
-                    loc_info = job.get('location', {}) or {}
-                    if isinstance(loc_info, dict):
-                        city_name = loc_info.get('city', '') or loc_info.get('name', '') or (city or '')
-                    else:
-                        city_name = str(loc_info) if loc_info else (city or '')
+                skills = job.get('skills', [])
+                if isinstance(skills, list):
+                    skills = [s.get('name', s) if isinstance(s, dict) else s for s in skills]
+                else:
+                    skills = []
 
-                    salary = ''
-                    salary_info = job.get('salary', {})
-                    if isinstance(salary_info, dict):
-                        min_s = salary_info.get('min', '')
-                        max_s = salary_info.get('max', '')
-                        if min_s or max_s:
-                            salary = f"{min_s} - {max_s}"
+                desc = job.get('description', '') or ''
+                job_id = job.get('id', '') or job.get('slug', '')
+                url = f"{BASE_URL}/jobs/{job_id}" if job_id else ''
+                remote = job.get('isRemote', False) or job.get('remote', False)
 
-                    seniority = (
-                        job.get('seniorityLevel', '') or
-                        job.get('seniority', '') or
-                        job.get('level', '') or
-                        ''
-                    )
-                    if isinstance(seniority, dict):
-                        seniority = seniority.get('title', '') or seniority.get('name', '')
+                results.append({
+                    'platform': 'irantalent',
+                    'title': title,
+                    'company': company,
+                    'city': city_name,
+                    'province': city_name,
+                    'salary': salary,
+                    'job_type': job.get('jobType', '') or job.get('employmentType', ''),
+                    'seniority_level': seniority,
+                    'description': desc[:500] if desc else '',
+                    'skills': skills,
+                    'url': url,
+                    'remote': remote,
+                    'posted_date': job.get('createdAt', '') or '',
+                })
 
-                    skills = job.get('skills', [])
-                    if isinstance(skills, list):
-                        skills = [
-                            s.get('name', s) if isinstance(s, dict) else s
-                            for s in skills
-                        ]
-                    else:
-                        skills = []
+            logger.info(f"IranTalent (API) page {page}: got {len(jobs)} jobs")
+            time.sleep(0.8)
 
-                    desc = job.get('description', '') or ''
-
-                    job_id = job.get('id', '') or job.get('slug', '')
-                    url = f"{BASE_URL}/jobs/{job_id}" if job_id else ''
-
-                    remote = job.get('isRemote', False) or job.get('remote', False)
-
-                    results.append({
-                        'platform': 'irantalent',
-                        'title': title,
-                        'company': company,
-                        'city': city_name,
-                        'province': city_name,
-                        'salary': salary,
-                        'job_type': job.get('jobType', '') or job.get('employmentType', ''),
-                        'seniority_level': seniority,
-                        'description': desc[:500] if desc else '',
-                        'skills': skills,
-                        'url': url,
-                        'remote': remote,
-                        'posted_date': job.get('createdAt', '') or '',
-                    })
-
-                logger.info(f"IranTalent (API) page {page}: got {len(jobs)} jobs")
-                break  # Found working endpoint, use it
-
-            except requests.Timeout:
-                logger.debug(f"IranTalent API timeout: {endpoint['url']}")
-                continue
-            except requests.ConnectionError:
-                logger.debug(f"IranTalent API connection error: {endpoint['url']}")
-                continue
-            except Exception as e:
-                logger.debug(f"IranTalent API error: {e}")
-                continue
-
-        if not found_any:
-            logger.info(f"IranTalent (API): no results on page {page}")
+        except requests.Timeout:
+            logger.warning(f"IranTalent API timeout at page {page}")
             break
-
-        time.sleep(1)
+        except Exception as e:
+            logger.error(f"IranTalent API page {page} error: {e}")
+            break
 
     if results:
         logger.info(f"IranTalent (API) total: {len(results)} jobs")
-        return results
-
-    logger.info("IranTalent: API approach returned no results")
-    return []
+    return results
 
 
 def _crawl_via_playwright(keywords, city, level, time_range, max_pages):
@@ -269,9 +235,8 @@ def _crawl_via_playwright(keywords, city, level, time_range, max_pages):
         bc.__enter__()
         if not bc.is_available:
             logger.warning(
-                "IranTalent: No browser available (neither Playwright Chromium nor "
-                "system Chrome/Edge found). Install Google Chrome or Edge, or run "
-                "'playwright install chromium' with a VPN that can access cdn.playwright.dev."
+                "IranTalent: No browser available. "
+                "Install Google Chrome/Edge, or run 'playwright install chromium' with VPN."
             )
             return []
 
@@ -286,8 +251,8 @@ def _crawl_via_playwright(keywords, city, level, time_range, max_pages):
         url = '/'.join(url_parts)
 
         try:
-            page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            page.wait_for_timeout(4000)
+            page.goto(url, wait_until='domcontentloaded', timeout=20000)
+            page.wait_for_timeout(3000)
         except Exception as e:
             logger.error(f"IranTalent PW navigation failed: {e}")
             return []
@@ -297,9 +262,8 @@ def _crawl_via_playwright(keywords, city, level, time_range, max_pages):
 
         for pg in range(max_pages):
             try:
-                # Wait for Angular to render
                 try:
-                    page.wait_for_selector('a[href*="/job"], .job-card, article', timeout=8000)
+                    page.wait_for_selector('a[href*="/job"], .job-card, article', timeout=6000)
                 except Exception:
                     pass
 
@@ -352,11 +316,6 @@ def _crawl_via_playwright(keywords, city, level, time_range, max_pages):
 
                         remote = 'remote' in card_text.lower() or 'دورکار' in card_text
 
-                        if keywords.strip():
-                            kw = keywords.strip().lower()
-                            if kw not in card_text.lower() and kw not in title.lower():
-                                continue
-
                         if title:
                             results.append({
                                 'platform': 'irantalent',
@@ -380,12 +339,10 @@ def _crawl_via_playwright(keywords, city, level, time_range, max_pages):
 
                 logger.info(f"IranTalent (PW) page {pg + 1}: {len(results)} total")
 
-                next_btn = page.query_selector(
-                    'a.next, button.next, [aria-label="Next"], .pagination-next'
-                )
+                next_btn = page.query_selector('a.next, button.next, [aria-label="Next"], .pagination-next')
                 if next_btn and next_btn.is_visible():
                     next_btn.click()
-                    page.wait_for_timeout(3000)
+                    page.wait_for_timeout(2000)
                 else:
                     break
 

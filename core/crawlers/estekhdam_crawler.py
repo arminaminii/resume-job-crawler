@@ -55,7 +55,7 @@ LEVEL_KEYWORDS = {
 
 
 def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
-                     time_range: str = '7', max_pages: int = 3) -> list:
+                     time_range: str = '7', max_pages: int = 2) -> list:
     """
     Crawl e-estekhdam.com for job listings.
     Strategy: Try requests+BS4 first, fall back to Playwright with system Chrome.
@@ -67,7 +67,9 @@ def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
     if city and city in CITY_MAP:
         search_path = f"/search/{CITY_MAP[city]}"
     elif keywords.strip():
-        search_path = f"/search/{keywords.strip()}"
+        # Only use first keyword for cleaner URL
+        first_kw = keywords.strip().split()[0] if keywords.strip() else ''
+        search_path = f"/search/{first_kw}"
     else:
         search_path = "/"
 
@@ -79,7 +81,7 @@ def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
 
     # First visit homepage to get cookies
     try:
-        session.get(BASE_URL, timeout=15)
+        session.get(BASE_URL, timeout=10)
     except Exception:
         pass
 
@@ -87,7 +89,7 @@ def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
     for page in range(1, max_pages + 1):
         try:
             url = f"{BASE_URL}{search_path}" if page == 1 else f"{BASE_URL}{search_path}?page={page}"
-            resp = session.get(url, headers=HEADERS, timeout=15)
+            resp = session.get(url, headers=HEADERS, timeout=10)
 
             if resp.status_code == 403:
                 logger.warning("E-estekhdam: 403 from requests, switching to Playwright...")
@@ -164,7 +166,7 @@ def crawl_estekhdam(keywords: str, city: str = '', level: str = 'all',
                     })
 
             logger.info(f"E-estekhdam (BS4) page {page}: got {len(results)} total items")
-            time.sleep(1.5)
+            time.sleep(1)
 
         except requests.Timeout:
             logger.error("E-estekhdam: request timeout")
@@ -195,8 +197,7 @@ def _crawl_with_playwright(keywords, city, level, time_range, max_pages, level_k
         bc.__enter__()
         if not bc.is_available:
             logger.warning(
-                "E-estekhdam: No browser available (neither Playwright Chromium nor "
-                "system Chrome/Edge found). Please install Google Chrome or Edge."
+                "E-estekhdam: No browser available. Install Google Chrome or Edge."
             )
             return []
 
@@ -205,13 +206,14 @@ def _crawl_with_playwright(keywords, city, level, time_range, max_pages, level_k
         if city and city in CITY_MAP:
             url = f"{BASE_URL}/search/{CITY_MAP[city]}"
         elif keywords.strip():
-            url = f"{BASE_URL}/search/{keywords.strip()}"
+            first_kw = keywords.strip().split()[0]
+            url = f"{BASE_URL}/search/{first_kw}"
         else:
             url = BASE_URL
 
         try:
-            page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            page.wait_for_timeout(3000)
+            page.goto(url, wait_until='domcontentloaded', timeout=20000)
+            page.wait_for_timeout(2000)
         except Exception as e:
             logger.error(f"E-estekhdam Playwright navigation failed: {e}")
             return []

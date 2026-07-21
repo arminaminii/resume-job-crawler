@@ -57,20 +57,6 @@ LEVEL_MAP = {
     'all': 0,
 }
 
-CATEGORY_SLUGS = {
-    'برنامه‌نویسی و توسعه نرم‌افزار': 'developer',
-    'علم داده و هوش مصنوعی': 'data-science',
-    'طراحی گرافیک و UI/UX': 'ui-ux',
-    'بازاریابی و فروش': 'digital-marketing',
-    'مالی و حسابداری': 'accounting',
-    'منابع انسانی': 'human-resources',
-    'مدیریت و رهبری': 'business-development',
-    'شبکه و زیرساخت': 'network',
-    'امنیت سایبری': 'network',
-    'DevOps و زیرساخت': 'developer',
-    'تولید محتوا و کپی‌رایتینگ': 'content',
-}
-
 # Timeout
 API_TIMEOUT = 20   # seconds per API call
 
@@ -79,10 +65,10 @@ session.headers.update(HEADERS)
 
 
 def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
-                    time_range: str = '7', max_pages: int = 3,
+                    time_range: str = '7', max_pages: int = 2,
                     category_slugs: list = None) -> list:
     """
-    Crawl Jobvision for job listings.
+    Crawl Jobvision for job listings via REST API.
     Returns list of dicts with job data.
     category_slugs: list of Jobvision category slugs from JobCategory.jobvision_slug
     """
@@ -119,7 +105,9 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
         except (ValueError, TypeError):
             pass
 
-    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', city={city}, level={level}, categories={category_slugs}, time_range={time_range}")
+    logger.info(f"Jobvision: searching keywords='{keywords.strip()[:50]}', "
+                f"city={city}, level={level}, categories={category_slugs}, "
+                f"time_range={time_range}, filters={list(filters.keys())}")
 
     for page in range(1, max_pages + 1):
         try:
@@ -134,7 +122,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
             data = resp.json()
 
             if not data.get('isSuccess'):
-                logger.warning(f"Jobvision API error: {data}")
+                logger.warning(f"Jobvision API error: {data.get('message', 'unknown')}")
                 break
 
             job_posts = data.get('data', {}).get('jobPosts', [])
@@ -148,43 +136,57 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     continue
                 seen_ids.add(job_id)
 
-                # Extract data from list
-                title_info = job.get('title', {})
-                title = title_info.get('titleFa', '') or title_info.get('titleEn', '')
+                # Title is a DIRECT STRING (not an object)
+                title = job.get('title', '')
 
-                company_info = job.get('company', {})
-                company = company_info.get('name', '')
+                # Company info
+                company_info = job.get('company', {}) or {}
+                company = company_info.get('nameFa', '') or company_info.get('nameEn', '')
 
-                location_info = job.get('location', {})
-                city_name = (location_info.get('city', {}) or {}).get('name', '')
-                province_name = (location_info.get('province', {}) or {}).get('name', '')
+                # Location info - city and province are nested objects
+                location_info = job.get('location', {}) or {}
+                city_obj = (location_info.get('city', {}) or {})
+                province_obj = (location_info.get('province', {}) or {})
+                city_name = (city_obj.get('titleFa', '') or
+                              city_obj.get('name', '') or
+                              province_obj.get('titleFa', ''))
 
-                salary_info = job.get('salary', {})
-                salary = ''
-                if salary_info:
-                    min_s = salary_info.get('minSalary', 0)
-                    max_s = salary_info.get('maxSalary', 0)
+                # Salary info
+                salary_info = job.get('salary', {}) or {}
+                salary = salary_info.get('titleFa', '')
+                if not salary:
+                    min_s = salary_info.get('min', '')
+                    max_s = salary_info.get('max', '')
                     if min_s or max_s:
-                        salary = f"{min_s or ''} - {max_s or ''} تومان"
-                    c = salary_info.get('currencyTitleFa', '')
-                    if c:
-                        salary = f"{salary} {c}".strip()
+                        salary = f"{min_s or ''} - {max_s or ''} میلیون تومان"
 
-                work_type_info = job.get('workType', {})
-                work_type = (work_type_info.get('titleFa', '') or
-                             work_type_info.get('titleEn', ''))
+                # Work type
+                work_type_info = job.get('workType', {}) or {}
+                work_type = work_type_info.get('titleFa', '') or work_type_info.get('titleEn', '')
 
-                seniority_info = job.get('seniorityLevel', {})
-                seniority = (seniority_info.get('titleFa', '') or
-                             seniority_info.get('titleEn', ''))
+                # Seniority level
+                seniority_info = job.get('seniorityLevel', {}) or {}
+                seniority = seniority_info.get('titleFa', '') or seniority_info.get('titleEn', '')
 
-                skills = [s.get('titleFa', '') or s.get('titleEn', '')
-                          for s in job.get('skills', []) if s]
+                # Skills
+                skills_raw = job.get('skills', []) or []
+                skills = []
+                for s in skills_raw:
+                    if isinstance(s, dict):
+                        skills.append(s.get('titleFa', '') or s.get('titleEn', ''))
+                    elif isinstance(s, str):
+                        skills.append(s)
 
-                is_remote = job.get('isRemote', False)
+                # Remote status
+                properties = job.get('properties', {}) or {}
+                is_remote = properties.get('isRemote', False)
 
-                # Get posted date from list data (no detail API call needed)
-                posted_date = job.get('publishedAtPersian', '') or ''
+                # Posted date
+                activation = job.get('activationTime', {}) or {}
+                posted_date = activation.get('beautifyFa', '') or ''
+
+                # Province name for display
+                province_name = province_obj.get('titleFa', '') or province_obj.get('name', '')
 
                 url = f"https://jobvision.ir/jobs/{job_id}"
 
@@ -192,7 +194,7 @@ def crawl_jobvision(keywords: str, city: str = '', level: str = 'all',
                     'platform': 'jobvision',
                     'title': title,
                     'company': company,
-                    'city': city_name or province_name,
+                    'city': city_name,
                     'province': province_name,
                     'salary': salary,
                     'job_type': work_type,
