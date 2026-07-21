@@ -167,8 +167,8 @@ def search_config(request, resume_id):
         selected_platforms = request.POST.getlist('platforms')
         selected_cats_post = request.POST.getlist('categories')
     else:
-        # GET: use form initial + AI suggestions
-        selected_platforms = form.platforms.initial if hasattr(form, 'platforms') else ['jobvision']
+        # GET: use defaults + AI suggestions
+        selected_platforms = ['jobvision']
         selected_cats_post = preselected_slugs
 
     if request.method == 'POST':
