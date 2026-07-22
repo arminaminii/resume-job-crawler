@@ -3,34 +3,37 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-venv/
 *.egg-info/
 dist/
 build/
-skills/
-upload/
-download/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
 
 # Django
-*.log
 db.sqlite3
-db.sqlite3-journal
-media/resumes/
+*.log
+media/
+staticfiles/
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Environment
 .env
 .env.local
 
-# Misc
-.git/
-worklog.md
-resume-job-crawler/db.sqlite3
-download/
-.env
-resume-job-crawler/
-venv/
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

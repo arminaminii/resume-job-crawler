@@ -1,5 +1,10 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from .models import Resume
+
+
+ALLOWED_EXTENSIONS = ('.pdf', '.png', '.jpg', '.jpeg', '.docx', '.txt', '.bmp', '.tiff')
+MAX_FILE_SIZE_MB = 10  # 10 MB max
 
 
 class ResumeUploadForm(forms.ModelForm):
@@ -14,6 +19,26 @@ class ResumeUploadForm(forms.ModelForm):
                 }
             ),
         }
+
+    def clean_file(self):
+        uploaded_file = self.cleaned_data.get('file')
+        if not uploaded_file:
+            return uploaded_file
+
+        # --- Server-side extension validation ---
+        name = uploaded_file.name.lower()
+        if not name.endswith(ALLOWED_EXTENSIONS):
+            raise ValidationError(
+                f'فرمت فایل پشتیبانی نمی‌شود. فرمت‌های مجاز: {", ".join(ALLOWED_EXTENSIONS)}'
+            )
+
+        # --- File size validation ---
+        if uploaded_file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
+            raise ValidationError(
+                f'حجم فایل نباید بیشتر از {MAX_FILE_SIZE_MB} مگابایت باشد.'
+            )
+
+        return uploaded_file
 
 
 class SearchConfigForm(forms.Form):
@@ -42,7 +67,7 @@ class SearchConfigForm(forms.Form):
             ('فارس', 'فارس (شیراز)'),
             ('خوزستان', 'خوزستان (اهواز)'),
             ('گیلان', 'گیلان (رشت)'),
-            ('مازندران', 'مازنداران (ساری)'),
+            ('مازندران', 'مازندران (ساری)'),
             ('آذربایجان شرقی', 'آذربایجان شرقی (تبریز)'),
             ('آذربایجان غربی', 'آذربایجان غربی (ارومیه)'),
             ('کرمان', 'کرمان'),

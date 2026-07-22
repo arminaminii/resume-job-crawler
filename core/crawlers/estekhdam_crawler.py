@@ -5,9 +5,10 @@ API endpoint: POST https://www.e-estekhdam.com/search-api/search?page=N
 Returns JSON with {ok: true, data: [...]} structure.
 
 FIXES APPLIED:
-1. Now sends 'title' keyword to the API body for server-side filtering
+1. Sends 'q' keyword to the API body for server-side filtering
 2. Uses client_filter_keywords for client-side category matching
-3. Increased page size and better error handling
+3. Thread-safe session creation (no module-level singleton)
+4. Fixed 'مدیر' collision between senior and manager level mappings
 """
 import requests
 import logging
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.e-estekhdam.com"
 SEARCH_API = f"{BASE_URL}/search-api/search"
 
-HEADERS = {
+_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "application/json",
@@ -26,6 +27,14 @@ HEADERS = {
     "Origin": BASE_URL,
     "Referer": f"{BASE_URL}/search/",
 }
+
+
+def _get_session():
+    """Create a new requests Session for each call (thread-safe)."""
+    s = requests.Session()
+    s.headers.update(_HEADERS)
+    return s
+
 
 PROVINCE_MAP = {
     'تهران': 'تهران', 'اصفهان': 'اصفهان', 'البرز': 'البرز',
@@ -55,9 +64,6 @@ BENEFIT_LABELS = {
 
 API_TIMEOUT = 25
 
-_session = requests.Session()
-_session.headers.update(HEADERS)
-
 
 def _job_matches_client_filter(job_data: dict, client_kws: list) -> bool:
     """Client-side OR filter using category keywords."""
@@ -80,8 +86,8 @@ def _job_matches_level(contracts: list, position_levels: list, level: str) -> bo
     lm = {
         'junior': ['کارآموز', 'جونیور', 'مبتدی', 'مقدماتی', 'مردود'],
         'mid': ['متوسط', 'میان‌رده'],
-        'senior': ['ارشد', 'سنیور', 'Senior', 'مدیر'],
-        'manager': ['مدیر', 'Manager', 'سرپرست'],
+        'senior': ['ارشد', 'سنیور', 'Senior', 'کارشناس ارشد', 'تخصص بالا'],
+        'manager': ['مدیر', 'Manager', 'سرپرست', 'مدیریتی'],
     }
     kws = lm.get(level, [])
     if not kws:
@@ -96,7 +102,7 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
                       client_filter_keywords: list = None) -> list:
     """
     Crawl e-estekhdam.com via REST API.
-    - keywords: user's search terms → sent to API as 'title'
+    - keywords: user's search terms -> sent to API as 'q'
     - category_slugs: E-estekhdam category names (sent to API if supported)
     - client_filter_keywords: category skills (client-side only)
     """
@@ -108,7 +114,6 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
     body = {}
 
     # Send keyword to API for server-side filtering
-    # CRITICAL: The correct field is 'q', not 'title'
     if keywords and keywords.strip():
         kw_parts = [k.strip() for k in keywords.strip().split()[:3] if k.strip()]
         if kw_parts:
@@ -137,7 +142,8 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
 
     for page in range(1, max_pages + 1):
         try:
-            resp = _session.post(
+            _s = _get_session()
+            resp = _s.post(
                 f"{SEARCH_API}?page={page}",
                 json=body,
                 timeout=API_TIMEOUT,

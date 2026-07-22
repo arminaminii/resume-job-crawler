@@ -73,9 +73,9 @@ def test_jobvision_no_category():
 
 
 def test_estekhdam():
-    """Test E-estekhdam BS4 crawler."""
+    """Test E-estekhdam REST API crawler."""
     print("\n" + "="*60)
-    print("TEST 3: E-estekhdam BS4 Crawler")
+    print("TEST 3: E-estekhdam REST API Crawler")
     print("="*60)
 
     from core.crawlers.estekhdam_crawler import crawl_estekhdam
@@ -86,6 +86,8 @@ def test_estekhdam():
         level='all',
         time_range='30',
         max_pages=1,
+        category_slugs=[],
+        client_filter_keywords=[],
     )
 
     print(f"\nResults: {len(results)} jobs found")
@@ -93,6 +95,32 @@ def test_estekhdam():
         r = results[0]
         print(f"  Title: {r.get('title', 'N/A')}")
         print(f"  Company: {r.get('company', 'N/A')}")
+    return len(results) > 0
+
+
+def test_irantalent():
+    """Test IranTalent REST API crawler."""
+    print("\n" + "="*60)
+    print("TEST 4: IranTalent REST API Crawler")
+    print("="*60)
+
+    from core.crawlers.irantalent_crawler import crawl_irantalent
+
+    results = crawl_irantalent(
+        keywords='python',
+        city='',
+        level='all',
+        time_range='30',
+        max_pages=1,
+        client_filter_keywords=[],
+    )
+
+    print(f"\nResults: {len(results)} jobs found")
+    if results:
+        r = results[0]
+        print(f"  Title: {r.get('title', 'N/A')}")
+        print(f"  Company: {r.get('company', 'N/A')}")
+        print(f"  URL: {r.get('url', 'N/A')}")
     return len(results) > 0
 
 
@@ -116,12 +144,19 @@ if __name__ == '__main__':
         print(f"Jobvision no-cat FAILED: {e}")
         results['jobvision_no_cat'] = False
 
-    # Test E-estekhdam (may fail behind certain ISPs)
+    # Test E-estekhdam
     try:
         results['estekhdam'] = test_estekhdam()
     except Exception as e:
         print(f"E-estekhdam FAILED: {e}")
         results['estekhdam'] = False
+
+    # Test IranTalent
+    try:
+        results['irantalent'] = test_irantalent()
+    except Exception as e:
+        print(f"IranTalent FAILED: {e}")
+        results['irantalent'] = False
 
     # Summary
     print("\n" + "#"*60)

@@ -67,8 +67,11 @@ PROVINCE_SLUGS = {
 
 API_TIMEOUT = 25
 
-session = requests.Session()
-session.headers.update(HEADERS)
+def _get_session():
+    """Create a new requests Session for each call (thread-safe)."""
+    s = requests.Session()
+    s.headers.update(HEADERS)
+    return s
 
 
 def _job_matches_client_filter(job: dict, client_kws: list) -> bool:
@@ -178,7 +181,8 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
             # keyword goes at TOP-LEVEL, not inside filters
             if clean_kw:
                 payload['keyword'] = clean_kw
-            resp = session.post(LIST_API, json=payload, timeout=API_TIMEOUT)
+            _s = _get_session()
+            resp = _s.post(LIST_API, json=payload, timeout=API_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 

@@ -23,12 +23,11 @@ DESIGN DECISIONS:
 - For E-estekhdam: only send keywords (slug filtering doesn't work)
 """
 import logging
-from typing import Dict, List, Optional, Tuple
 from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
-# Platform-specific keyword overrides for common skills/positions.
+# Farsi-to-English normalization map
 # When a skill is detected, use these EXACT terms for each platform.
 # Format: { 'skill_keyword': { 'platform_id': 'platform_specific_keyword' } }
 SKILL_ALIASES = {

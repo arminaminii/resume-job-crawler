@@ -50,7 +50,7 @@ def extract_text_from_image(image_path: str) -> str:
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
     Extract text from PDF files.
-    Strategy: PyMuPDF (fast, text-based) -> pdf2image+Tesseract (image-based) -> PyPDF2
+    Strategy: PyMuPDF (fast, text-based) -> pdf2image+Tesseract (image-based)
     """
     text_parts = []
 
@@ -75,26 +75,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     except Exception as e:
         logger.warning(f"OCR: PyMuPDF failed: {e}")
 
-    # Step 2: PyPDF2 (another text-based option)
-    try:
-        import PyPDF2
-        logger.info("OCR: trying PyPDF2")
-        with open(pdf_path, 'rb') as f:
-            reader = PyPDF2.PdfReader(f)
-            for page in reader.pages:
-                t = page.extract_text()
-                if t and t.strip():
-                    text_parts.append(t.strip())
-        result = '\n'.join(text_parts)
-        if result.strip():
-            logger.info(f"OCR: PyPDF2 extracted {len(result)} chars")
-            return result
-    except ImportError:
-        logger.debug("OCR: PyPDF2 not installed")
-    except Exception as e:
-        logger.debug(f"OCR: PyPDF2 failed: {e}")
-
-    # Step 3: pdf2image + Tesseract (for scanned/image-based PDFs)
+    # Step 2: pdf2image + Tesseract (for scanned/image-based PDFs)
     _setup_tesseract()
     poppler_path = _get_poppler_path()
     try:

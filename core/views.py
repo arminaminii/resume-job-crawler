@@ -6,6 +6,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.conf import settings
 from django.http import JsonResponse
+from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_POST, require_GET
 
 from .models import Resume, JobSearch, JobListing, JobCategory
 from .forms import ResumeUploadForm, SearchConfigForm
@@ -26,52 +28,7 @@ def home(request):
     if request.method == 'POST':
         form = ResumeUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            resume = form.save()
-
-            # Extract text using OCR
-            try:
-                text = extract_resume_text(resume.file.path)
-                resume.full_text = text
-
-                logger.info(f"Resume #{resume.id}: OCR extracted {len(text)} chars")
-
-                # Classify with BERT / rule-based
-                if text:
-                    result = classify_resume(text)
-                    resume.extracted_skills = result['skills']
-                    resume.extracted_fields = result['fields']
-                    resume.suggested_category = result['category']
-                    resume.confidence_score = result['confidence']
-                    resume.save()
-
-                    logger.info(
-                        f"Resume #{resume.id}: category={result['category']}, "
-                        f"confidence={result['confidence']}, "
-                        f"skills={result['skills']}, "
-                        f"fields={result['fields']}"
-                    )
-
-                    if result['skills'] or result['fields']:
-                        messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
-                    else:
-                        messages.warning(
-                            request,
-                            'رزومه آپلود شد ولی مهارت‌هایی شناسایی نشد. '
-                            'لطفاً کلمات کلیدی را دستی وارد کنید.'
-                        )
-                else:
-                    resume.save()
-                    messages.warning(
-                        request,
-                        'متنی از رزومه استخراج نشد. '
-                        'اگر فایل PDF تصویری است، مطمئن شوید Poppler نصب شده.'
-                    )
-            except Exception as e:
-                logger.error(f"Resume #{resume.id} processing error: {e}", exc_info=True)
-                resume.save()
-                messages.error(request, f'خطا در پردازش رزومه: {str(e)[:200]}')
-
-            return redirect('search_config', resume_id=resume.id)
+            return _process_uploaded_resume(request, form)
 
     return render(request, 'core/home.html', {
         'form': form,
@@ -80,41 +37,51 @@ def home(request):
 
 
 def upload_resume(request):
-    """Handle resume upload via AJAX or form."""
+    """Handle resume upload — delegates to home() logic (kept for backward compat)."""
     if request.method == 'POST':
         form = ResumeUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            resume = form.save()
-
-            try:
-                text = extract_resume_text(resume.file.path)
-                resume.full_text = text
-
-                logger.info(f"Resume #{resume.id}: OCR extracted {len(text)} chars")
-
-                if text:
-                    result = classify_resume(text)
-                    resume.extracted_skills = result['skills']
-                    resume.extracted_fields = result['fields']
-                    resume.suggested_category = result['category']
-                    resume.confidence_score = result['confidence']
-                    resume.save()
-
-                    if result['skills'] or result['fields']:
-                        messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
-                    else:
-                        messages.warning(request, 'مهارت‌هایی شناسایی نشد. کلمات کلیدی را دستی وارد کنید.')
-                else:
-                    resume.save()
-                    messages.warning(request, 'متنی از رزومه استخراج نشد.')
-            except Exception as e:
-                logger.error(f"Resume #{resume.id} processing error: {e}", exc_info=True)
-                resume.save()
-                messages.error(request, 'خطا در پردازش رزومه')
-
-            return redirect('search_config', resume_id=resume.id)
-
+            return _process_uploaded_resume(request, form)
     return redirect('home')
+
+
+def _process_uploaded_resume(request, form):
+    """Shared logic for processing an uploaded resume (DRY helper)."""
+    resume = form.save()
+    try:
+        text = extract_resume_text(resume.file.path)
+        resume.full_text = text
+        logger.info(f"Resume #{resume.id}: OCR extracted {len(text)} chars")
+
+        if text:
+            result = classify_resume(text)
+            resume.extracted_skills = result['skills']
+            resume.extracted_fields = result['fields']
+            resume.suggested_category = result['category']
+            resume.confidence_score = result['confidence']
+            resume.save()
+
+            if result['skills'] or result['fields']:
+                messages.success(request, 'رزومه با موفقیت آپلود و تحلیل شد.')
+            else:
+                messages.warning(
+                    request,
+                    'رزومه آپلود شد ولی مهارت‌هایی شناسایی نشد. '
+                    'لطفاً کلمات کلیدی را دستی وارد کنید.'
+                )
+        else:
+            resume.save()
+            messages.warning(
+                request,
+                'متنی از رزومه استخراج نشد. '
+                'اگر فایل PDF تصویری است، مطمئن شوید Poppler نصب شده.'
+            )
+    except Exception as e:
+        logger.error(f"Resume #{resume.id} processing error: {e}", exc_info=True)
+        resume.save()
+        messages.error(request, f'خطا در پردازش رزومه: {str(e)[:200]}')
+
+    return redirect('search_config', resume_id=resume.id)
 
 
 def _get_suggested_categories(resume):
@@ -415,7 +382,7 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
 
 
 def search_results(request, search_id):
-    """Display search results with filtering."""
+    """Display search results with filtering and pagination."""
     search = get_object_or_404(JobSearch, pk=search_id)
     listings = search.listings.all()
 
@@ -440,7 +407,17 @@ def search_results(request, search_id):
             Q(skills__contains=[keyword_filter])
         )
 
-    # Get unique values for filters
+    # Pagination (20 per page)
+    from django.core.paginator import Paginator
+    paginator = Paginator(listings, 20)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except Exception:
+        page_obj = paginator.page(1)
+    listings = page_obj
+
+    # Get unique values for filters (from ALL listings, not just current page)
     platforms = search.listings.values_list('platform', flat=True).distinct()
     cities = search.listings.values_list('city', flat=True).distinct()
     levels = search.listings.values_list('seniority_level', flat=True).distinct()
@@ -471,11 +448,13 @@ def search_results(request, search_id):
         'levels': [l for l in levels if l],
         'platform_names': PLATFORM_NAMES,
         'selected_cat_names': selected_cat_names,
+        'page_obj': page_obj,
     })
 
 
+@require_POST
 def delete_resume(request, resume_id):
-    """Delete a resume and all related data."""
+    """Delete a resume and all related data. CSRF-protected POST only."""
     resume = get_object_or_404(Resume, pk=resume_id)
     if resume.file:
         resume.file.delete(save=False)
@@ -519,8 +498,11 @@ def suggest_categories_api(request, resume_id):
 
 def job_tree(request):
     """Display the interactive job category tree with skills, education, and career paths."""
-    # Get all root (parent-less) categories
-    roots = JobCategory.objects.filter(parent=None, is_active=True).order_by('sort_order')
+    # Get all root (parent-less) categories with prefetched children
+    roots = (JobCategory.objects
+             .filter(parent=None, is_active=True)
+             .prefetch_related('children')
+             .order_by('sort_order'))
     return render(request, 'core/job_tree.html', {
         'roots': roots,
         'total_categories': JobCategory.objects.filter(is_active=True).count(),
@@ -528,8 +510,12 @@ def job_tree(request):
 
 
 @cache_page(60 * 15)
+@require_GET
 def job_tree_api(request):
     """API: returns full tree as JSON for interactive frontend."""
-    roots = JobCategory.objects.filter(parent=None, is_active=True).order_by('sort_order')
+    roots = (JobCategory.objects
+             .filter(parent=None, is_active=True)
+             .prefetch_related('children')
+             .order_by('sort_order'))
     tree = [r.get_tree_data() for r in roots]
     return JsonResponse({'tree': tree, 'total': len(tree)})

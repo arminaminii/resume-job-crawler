@@ -237,4 +237,17 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div class="jf-pagination-wrap">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&platform={{ platform_filter }}&city={{ city_filter }}&level={{ level_filter }}&q={{ keyword_filter }}" class="jf-btn jf-btn-ghost jf-btn-sm">صفحه قبل</a>
+    {% endif %}
+    <span class="jf-pagination-info">صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&platform={{ platform_filter }}&city={{ city_filter }}&level={{ level_filter }}&q={{ keyword_filter }}" class="jf-btn jf-btn-ghost jf-btn-sm">صفحه بعد</a>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}

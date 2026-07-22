@@ -11,6 +11,8 @@ import os
 import sys
 import logging
 import subprocess
+from typing import Optional as _Optional
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ _MAC_BROWSER_PATHS = [
 _cached_path = None
 
 
-def get_chromium_executable() -> str | None:
+def get_chromium_executable():
     """
     Find a Chromium-based browser on the system.
     Returns the path to the executable, or None if not found.
@@ -60,7 +62,7 @@ def get_chromium_executable() -> str | None:
     """
     global _cached_path
     if _cached_path is not None:
-        return _cached_path
+        return _cached_path if _cached_path else None
 
     paths = []
     if sys.platform == 'win32':
@@ -96,7 +98,7 @@ def get_chromium_executable() -> str | None:
     return None
 
 
-def is_playwright_ready() -> bool:
+def is_playwright_ready():
     """Quick check if Playwright can launch a browser (no actual launch)."""
     try:
         import playwright  # noqa: F401
@@ -105,25 +107,31 @@ def is_playwright_ready() -> bool:
     return True
 
 
+@contextmanager
 def launch_browser(headless=True, user_agent=None, locale='fa-IR'):
     """
     Context manager that launches a browser using the best available method.
     Uses system Chrome if Playwright's Chromium is not installed.
 
-    Yields: (browser, context) tuple
+    Yields: (browser, context) tuple — both will be None if launch fails.
 
     Usage:
         from core.crawlers.playwright_helper import launch_browser
         with launch_browser(headless=True, user_agent="...") as (browser, context):
+            if browser is None:
+                print("No browser available")
+                return
             page = context.new_page()
             page.goto("https://...")
     """
     from playwright.sync_api import sync_playwright
 
-    pw = sync_playwright().start()
+    pw = None
     browser = None
 
     try:
+        pw = sync_playwright().start()
+
         # Try launching Playwright's bundled Chromium first
         try:
             browser = pw.chromium.launch(headless=headless, timeout=15000)
@@ -148,8 +156,8 @@ def launch_browser(headless=True, user_agent=None, locale='fa-IR'):
                     browser = None
 
         if browser is None:
-            pw.stop()
-            return None, None
+            yield None, None
+            return
 
         # Create context
         context_kwargs = {'locale': locale}
@@ -166,7 +174,8 @@ def launch_browser(headless=True, user_agent=None, locale='fa-IR'):
         except Exception:
             pass
         try:
-            pw.stop()
+            if pw:
+                pw.stop()
         except Exception:
             pass
 

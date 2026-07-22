@@ -65,7 +65,10 @@ class JobCategory(models.Model):
         return ' > '.join(path)
 
     def get_tree_data(self):
-        """Return dict for tree JSON serialization."""
+        """Return dict for tree JSON serialization.
+        Uses select_related/prefetch_related to avoid N+1 queries.
+        """
+        children = self.children.filter(is_active=True).order_by('sort_order')
         data = {
             'id': self.id,
             'name': self.name,
@@ -78,11 +81,9 @@ class JobCategory(models.Model):
             'certifications': self.certifications or [],
             'salary_range': self.salary_range,
             'career_path': self.career_path,
-            'has_children': self.children.filter(is_active=True).exists(),
-            'children': [],
+            'has_children': children.exists(),
+            'children': [child.get_tree_data() for child in children],
         }
-        for child in self.children.filter(is_active=True).order_by('sort_order'):
-            data['children'].append(child.get_tree_data())
         return data
 
     def match_score(self, extracted_skills: list, extracted_text: str = '') -> float:

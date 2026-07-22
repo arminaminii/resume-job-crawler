@@ -137,15 +137,20 @@ def _parse_location(location_data: dict) -> str:
 
 
 def _extract_skills_from_desc(role_description: str) -> list:
-    """Extract skills mentioned in HTML description (basic extraction)."""
+    """Extract meaningful text snippet from HTML description.
+    
+    Returns a short plain-text summary (not individual skills),
+    suitable for display and client-side keyword matching.
+    """
     if not role_description:
         return []
-    # Simple extraction: look for common skill patterns
     import re
     # Remove HTML tags
     text = re.sub(r'<[^>]+>', ' ', role_description)
     text = re.sub(r'&[a-z]+;', ' ', text)
-    return text.strip()[:200]  # Return truncated description as context
+    text = re.sub(r'\s+', ' ', text).strip()
+    snippet = text[:200].strip()
+    return [snippet] if snippet else []
 
 
 def _job_matches_level(seniority_data, level: str) -> bool:
@@ -320,17 +325,16 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                 if not _job_matches_level(seniority_data, level):
                     continue
 
-                # Keyword-based filtering (safety net)
+                # Combined keyword filtering (OR logic: match ANY of user keywords OR category keywords)
+                all_filter_kws = []
                 if keywords and keywords.strip():
-                    kw_list = [k.strip().lower() for k in keywords.split() if k.strip()]
-                    combined = f"{title} {company} {desc_text}".lower()
-                    if not any(term in combined for term in kw_list):
-                        continue
-
-                # Category-based filtering
+                    all_filter_kws.extend([k.strip().lower() for k in keywords.split() if k.strip()])
                 if cfk:
-                    combined_all = f"{title} {company} {' '.join(skills)} {desc_text}".lower()
-                    if not any(kw.lower() in combined_all for kw in cfk):
+                    all_filter_kws.extend([kw.lower() for kw in cfk])
+
+                if all_filter_kws:
+                    combined_all = f"{title} {company} {' '.join(str(s) for s in skills)} {desc_text}".lower()
+                    if not any(term in combined_all for term in all_filter_kws):
                         continue
 
                 page_matched += 1

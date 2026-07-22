@@ -1,4 +1,4 @@
-django==5.1
+django>=5.1,<6.0
 pillow>=10.0.0
 requests>=2.31.0
 beautifulsoup4>=4.12.0
@@ -14,3 +14,5 @@ pdf2image>=1.16.0
 regex>=2023.0.0
 PyMuPDF>=1.23.0
 python-docx>=1.0.0
+python-dotenv>=1.0.0
+gunicorn>=21.0.0
