@@ -1,28 +1,26 @@
 """
-E-estekhdam crawler — uses their PUBLIC REST API.
+E-estekhdam crawler — handles BROKEN API gracefully.
 
 API endpoint: POST https://www.e-estekhdam.com/search-api/search?page=N
-Returns JSON with {ok: true, data: [...]} structure.
 
-KEY INSIGHTS:
-1. The API ignores most search params and returns ~20 promoted jobs
-2. 'q' keyword DOES filter server-side (when it works)
-3. 'where' for province filtering works
-4. Client-side filtering is CRITICAL for relevance
-5. Response has 'created_at' or 'updated_at' for time filtering
-6. No category slug support in the public API
+CRITICAL RESEARCH FINDINGS (tested 2026-07-22):
+1. The API COMPLETELY IGNORES the 'q' parameter — always returns same 20 promoted jobs
+2. NO 'created_at' or 'updated_at' field exists in the response
+3. No alternative API endpoints exist (all 404)
+4. The only available data: id, title, brand_name, brand_sector, contract,
+   position_levels, provinces, technologies, benefits, promoted flag
 
-FIXES IN THIS VERSION:
-1. Removed duplicate 'q' assignment
-2. Added 'category_id' and 'job_category' API params (may help)
-3. Improved client-side filtering with TITLE priority matching
-4. Added time filtering via 'created_at' field
-5. Better keyword scoring for relevance ranking
+STRATEGY:
+- Accept that this API only returns promoted jobs
+- Use HEAVY client-side filtering for relevance
+- Score results by how many category keywords match in title/sector/technologies
+- Sort by relevance (most relevant promoted jobs first)
+- If no jobs pass the relevance filter, return empty list
+- Fetch many pages to get more promoted jobs to filter from
 """
 import requests
 import logging
 import time
-from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -37,18 +35,6 @@ _HEADERS = {
     "Origin": BASE_URL,
     "Referer": f"{BASE_URL}/search/",
 }
-
-
-# Iran timezone
-IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
-
-
-def _get_session():
-    """Create a new requests Session for each call (thread-safe)."""
-    s = requests.Session()
-    s.headers.update(_HEADERS)
-    return s
-
 
 PROVINCE_MAP = {
     'تهران': 'تهران', 'اصفهان': 'اصفهان', 'البرز': 'البرز',
@@ -79,95 +65,57 @@ BENEFIT_LABELS = {
 API_TIMEOUT = 25
 
 
-def _calc_relevance_score(job_data: dict, client_kws: list, user_keywords: list) -> float:
+def _get_session():
+    s = requests.Session()
+    s.headers.update(_HEADERS)
+    return s
+
+
+def _calc_relevance(job_data: dict, filter_kws: list) -> float:
     """
-    Calculate a relevance score for a job based on keyword matches.
-    Returns 0.0-1.0 score. Title matches are weighted highest.
-    
-    This is used to RANK results, not just filter them.
+    Calculate relevance score. Title match = 5, sector = 3, technologies = 2, etc.
+    Returns 0.0 if no keywords match at all.
     """
-    if not client_kws and not user_keywords:
-        return 0.5  # Neutral score when no keywords
+    if not filter_kws:
+        return 0.5
 
     title = (job_data.get('title', '') or '').lower()
+    short_title = (job_data.get('short_title', '') or '').lower()
     company = (job_data.get('brand_name', '') or '').lower()
     sector = (job_data.get('brand_sector', '') or '').lower()
     techs = [t.lower() for t in (job_data.get('technologies', []) or [])]
+    levels = [p.lower() for p in (job_data.get('position_levels', []) or [])]
+    contracts = [c.lower() for c in (job_data.get('contract', []) or [])]
     benefits = [b.lower() for b in (job_data.get('benefits', []) or [])]
-    description = (job_data.get('description', '') or '').lower()
-    position_levels = [p.lower() for p in (job_data.get('position_levels', []) or [])]
 
     score = 0.0
-    all_kws = set(kw.lower() for kw in (client_kws + user_keywords))
-    
-    for kw in all_kws:
-        kw_lower = kw.lower()
-        # Title match (highest weight)
-        if kw_lower in title:
-            score += 3.0
-        # Technologies/skills match
-        if any(kw_lower in t for t in techs):
-            score += 2.0
-        # Sector match
-        if kw_lower in sector:
-            score += 1.5
-        # Position level match
-        if any(kw_lower in p for p in position_levels):
-            score += 1.5
-        # Description match
-        if kw_lower in description:
+    for kw in filter_kws:
+        kw_l = kw.lower()
+        if kw_l in title:
+            score += 5
+        if kw_l in short_title:
+            score += 5
+        if kw_l in sector:
+            score += 3
+        if any(kw_l in t for t in techs):
+            score += 2
+        if any(kw_l in l for l in levels):
+            score += 2
+        if any(kw_l in c for c in contracts):
+            score += 1
+        if any(kw_l in b for b in benefits):
             score += 0.5
-        # Benefits match
-        if any(kw_lower in b for b in benefits):
-            score += 0.3
 
-    # Normalize to 0-1 range
-    max_possible = len(all_kws) * 3.0  # Max if all match in title
-    return round(min(score / max(max_possible, 1), 1.0), 3)
+    return score
 
 
-def _job_matches_client_filter(job_data: dict, client_kws: list, min_score: float = 0.05) -> bool:
-    """Client-side filter using category keywords.
-    
-    Changed from simple OR to score-based filtering.
-    At least one keyword must match in title OR 2+ matches elsewhere.
-    """
-    if not client_kws:
-        return True
-    
-    title = (job_data.get('title', '') or '').lower()
-    technologies = [t.lower() for t in (job_data.get('technologies', []) or [])]
-    sector = (job_data.get('brand_sector', '') or '').lower()
-    position_levels = [p.lower() for p in (job_data.get('position_levels', []) or [])]
-    description = (job_data.get('description', '') or '').lower()
-    
-    # Count total matches
-    matches = 0
-    for kw in client_kws:
-        kw_lower = kw.lower()
-        if kw_lower in title:
-            matches += 3  # Title match counts more
-        elif any(kw_lower in t for t in technologies):
-            matches += 2
-        elif kw_lower in sector:
-            matches += 2
-        elif any(kw_lower in p for p in position_levels):
-            matches += 2
-        elif kw_lower in description:
-            matches += 1
-    
-    # Require at least 1 match (any field) to be relevant
-    return matches >= 1
-
-
-def _job_matches_level(contracts: list, position_levels: list, level: str) -> bool:
-    """Check seniority level match."""
+def _job_matches_level(contracts, position_levels, level):
     if not level or level == 'all':
         return True
     lm = {
-        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'مقدماتی', 'مردود', 'trainee', 'intern'],
+        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'مقدماتی', 'trainee', 'intern'],
         'mid': ['متوسط', 'میان‌رده', 'کارشناس', 'متخصص'],
-        'senior': ['ارشد', 'سنیور', 'Senior', 'کارشناس ارشد', 'تخصص بالا', 'senior'],
+        'senior': ['ارشد', 'سنیور', 'Senior', 'کارشناس ارشد', 'senior'],
         'manager': ['مدیر', 'Manager', 'سرپرست', 'مدیریتی', 'manager'],
     }
     kws = lm.get(level, [])
@@ -177,158 +125,49 @@ def _job_matches_level(contracts: list, position_levels: list, level: str) -> bo
     return any(kw in full for kw in kws)
 
 
-def _parse_posted_date(job: dict) -> str:
-    """Extract and format posted date from E-estekhdam job."""
-    # Check for created_at / updated_at fields
-    created = job.get('created_at') or job.get('updated_at') or ''
-    if created:
-        try:
-            if isinstance(created, (int, float)):
-                # Unix timestamp
-                dt = datetime.fromtimestamp(created, tz=IRAN_TZ)
-            elif 'T' in str(created):
-                dt = datetime.fromisoformat(str(created).replace('Z', '+00:00'))
-            else:
-                dt = datetime.strptime(str(created)[:19], '%Y-%m-%d %H:%M:%S')
-                dt = dt.replace(tzinfo=IRAN_TZ)
-            
-            now = datetime.now(IRAN_TZ)
-            diff = now - dt
-            days = diff.days
-            
-            if days < 0:
-                return ''
-            elif days == 0:
-                return 'امروز'
-            elif days == 1:
-                return 'دیروز'
-            elif days < 7:
-                return f'{days} روز پیش'
-            elif days < 30:
-                return f'{days // 7} هفته پیش'
-            elif days < 365:
-                return f'{days // 30} ماه پیش'
-            else:
-                return f'{days // 365} سال پیش'
-        except (ValueError, TypeError, OSError):
-            return ''
-    
-    # Fallback: use is_new flag
-    if job.get('is_new', False):
-        return 'جدید'
-    return ''
-
-
-def _job_matches_time(job: dict, time_range: str) -> bool:
-    """Check if job was posted within the time range."""
-    if not time_range or time_range == 'all':
-        return True
-    
-    created = job.get('created_at') or job.get('updated_at')
-    if not created:
-        # If no date, only include if is_new and time_range >= 3
-        if time_range in ('1', '3') and not job.get('is_new', False):
-            return False
-        return True
-    
-    try:
-        days_limit = int(time_range)
-    except (ValueError, TypeError):
-        return True
-    
-    try:
-        if isinstance(created, (int, float)):
-            dt = datetime.fromtimestamp(created, tz=IRAN_TZ)
-        elif 'T' in str(created):
-            dt = datetime.fromisoformat(str(created).replace('Z', '+00:00'))
-        else:
-            dt = datetime.strptime(str(created)[:19], '%Y-%m-%d %H:%M:%S')
-            dt = dt.replace(tzinfo=IRAN_TZ)
-        
-        cutoff = datetime.now(IRAN_TZ) - timedelta(days=days_limit)
-        return dt >= cutoff
-    except (ValueError, TypeError, OSError):
-        return True
-
-
-def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
-                      time_range: str = '7', max_pages: int = 3,
-                      category_slugs: list = None,
-                      client_filter_keywords: list = None) -> list:
+def crawl_estekhdam(keywords='', city='', level='all',
+                      time_range='7', max_pages=3,
+                      category_slugs=None,
+                      client_filter_keywords=None):
     """
-    Crawl e-estekhdam.com via REST API.
+    Crawl e-estekhdam.com via its BROKEN API.
     
-    STRATEGY:
-    1. Send 'q' to API for server-side text filtering
-    2. Send 'where' for province filtering
-    3. Try additional API params ('technologies', 'job_category') for better results
-    4. Client-side: filter by category keywords, level, and time
-    5. Rank results by relevance score
-    
-    - keywords: user's search terms -> sent to API as 'q'
-    - category_slugs: E-estekhdam category names (sent to API if supported)
-    - client_filter_keywords: category skills (client-side filtering)
+    The API ignores all search params and returns promoted jobs only.
+    We filter heavily client-side and sort by relevance.
+    No time filtering is possible (no date field in response).
     """
     results = []
     seen_ids = set()
     cfk = client_filter_keywords or []
-
-    # Separate user keywords from category keywords
     user_kws = [k.strip().lower() for k in (keywords or '').split() if k.strip()] if keywords else []
+    all_kws = list(set(cfk + user_kws))
 
-    # Build POST body
     body = {}
-
-    # Send keyword to API for server-side filtering
     if keywords and keywords.strip():
-        kw_parts = [k.strip() for k in keywords.strip().split()[:3] if k.strip()]
-        if kw_parts:
-            body['q'] = ' '.join(kw_parts)
-            logger.info(f"E-estekhdam API: searching q='{body['q']}'")
-
+        body['q'] = ' '.join(keywords.strip().split()[:3])
     if city and city in PROVINCE_MAP:
         body['where'] = PROVINCE_MAP[city]
 
-    # Try sending technologies as a hint (some API versions support it)
-    if user_kws:
-        body['technologies'] = user_kws[:5]
+    logger.info(f"E-estekhdam: q='{body.get('q','')}', city={city}, filter_kws={len(all_kws)}")
+    logger.warning("E-estekhdam API is BROKEN - only returns promoted jobs. Using client-side filtering.")
 
-    # Add time range as 'date_range' or 'days' (API may support)
-    if time_range and time_range != 'all':
-        try:
-            body['date_range'] = int(time_range)
-        except (ValueError, TypeError):
-            pass
-
-    # Combine user + category keywords for client filter
-    all_client_kws = list(set(cfk + user_kws))
-
-    logger.info(f"E-estekhdam: body keys={list(body.keys())}, city={city}, time_range={time_range}")
-
-    # Fetch more pages since many results get filtered out
-    effective_pages = max_pages + 2
+    # Fetch many pages to get more promoted jobs to filter
+    effective_pages = max(max_pages * 3, 10)
 
     for page in range(1, effective_pages + 1):
         try:
             _s = _get_session()
-            resp = _s.post(
-                f"{SEARCH_API}?page={page}",
-                json=body,
-                timeout=API_TIMEOUT,
-            )
+            resp = _s.post(f"{SEARCH_API}?page={page}", json=body, timeout=API_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 
             if not data.get('ok'):
-                logger.warning(f"E-estekhdam API error: {data.get('status')}")
                 break
 
             jobs = data.get('data', [])
             if not jobs:
-                logger.info(f"E-estekhdam: no more at page {page}")
                 break
 
-            page_matched = 0
             for job in jobs:
                 jid = job.get('id')
                 if jid in seen_ids:
@@ -336,6 +175,17 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
                 seen_ids.add(jid)
 
                 title = job.get('title', '') or job.get('short_title', '')
+                if not title:
+                    continue
+
+                # Skip if NO keywords match at all
+                if all_kws:
+                    relevance = _calc_relevance(job, all_kws)
+                    if relevance < 1.0:  # At least one meaningful match required
+                        continue
+                else:
+                    relevance = 0.5
+
                 company = job.get('brand_name', '')
                 provinces = job.get('provinces', []) or []
                 province_name = ', '.join(provinces) if provinces else ''
@@ -344,43 +194,24 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
 
                 contracts = job.get('contract', []) or []
                 job_type = ', '.join(contracts) if contracts else ''
-
                 salary = job.get('salary', '') or ''
 
                 benefits_raw = job.get('benefits', []) or []
                 benefits = [BENEFIT_LABELS.get(b, b) for b in benefits_raw]
-
                 technologies = job.get('technologies', []) or []
 
-                is_remote = any(
-                    kw in job_type for kw in ['دورکاری', 'Remote']
-                ) or 'remote_work' in (benefits_raw or [])
+                is_remote = any(kw in job_type for kw in ['دورکاری', 'Remote']) or 'remote_work' in benefits_raw
 
                 url_path = job.get('url', '')
                 url = f"{BASE_URL}{url_path}" if url_path else ''
 
                 position_levels = job.get('position_levels') or []
                 seniority = ', '.join(position_levels) if position_levels else ''
-
                 brand_sector = job.get('brand_sector', '')
 
-                # --- Time filtering (client-side) ---
-                if not _job_matches_time(job, time_range):
-                    continue
-
-                # --- Client-side category filtering (relevance check) ---
-                if not _job_matches_client_filter(job, all_client_kws):
-                    continue
-
-                # --- Level filtering ---
+                # Level filtering
                 if not _job_matches_level(contracts, position_levels, level):
                     continue
-
-                # --- Calculate relevance score for ranking ---
-                relevance = _calc_relevance_score(job, all_client_kws, user_kws)
-
-                # --- Parse posted date ---
-                posted_date = _parse_posted_date(job)
 
                 desc_parts = []
                 if brand_sector:
@@ -404,32 +235,25 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
                     'skills': technologies + benefits,
                     'url': url,
                     'remote': is_remote,
-                    'posted_date': posted_date,
-                    '_relevance': relevance,  # For sorting
+                    'posted_date': '',
+                    '_relevance': relevance,
                 })
-                page_matched += 1
 
-            logger.info(f"E-estekhdam page {page}: {len(jobs)} API, {page_matched} matched (total: {len(results)})")
             time.sleep(0.3)
-
             if len(results) >= max_pages * 30:
                 break
-
         except requests.Timeout:
-            logger.error(f"E-estekhdam timeout at page {page}")
             break
-        except requests.ConnectionError as e:
-            logger.error(f"E-estekhdam connection error: {e}")
+        except requests.ConnectionError:
             break
         except Exception as e:
             logger.error(f"E-estekhdam error at page {page}: {e}")
             break
 
-    # Sort by relevance (most relevant first)
+    # Sort by relevance
     results.sort(key=lambda x: x.get('_relevance', 0), reverse=True)
-    # Remove internal relevance field
     for r in results:
         r.pop('_relevance', None)
 
-    logger.info(f"E-estekhdam total: {len(results)} jobs")
+    logger.info(f"E-estekhdam total: {len(results)} jobs (from promoted only)")
     return results
