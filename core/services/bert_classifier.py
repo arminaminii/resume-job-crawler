@@ -2,13 +2,22 @@ import re
 
 
 # --- Skill & Field Dictionaries for Persian resumes ---
+# Keys are matched with WORD BOUNDARIES for Latin text to avoid false positives
+# (e.g. 'javascript' must NOT match 'java', 'ui' must NOT match 'built')
+# CJK/Persian keys use substring matching (safe because they're multi-char)
+
+# Order matters: longer/more-specific keys MUST come before shorter ones
 SKILLS_DICT = {
     # Programming
-    'python': 'Python', 'پایتون': 'Python', 'django': 'Django', 'جنگو': 'Django',
-    'flask': 'Flask', 'javascript': 'JavaScript', 'جاوااسکریپت': 'JavaScript',
-    'typescript': 'TypeScript', 'react': 'React', 'ری‌اکت': 'React',
-    'vue': 'Vue.js', 'node': 'Node.js', 'نود': 'Node.js',
-    'java': 'Java', 'جاوا': 'Java', 'spring': 'Spring', 'c#': 'C#',
+    'python': 'Python', 'پایتون': 'Python',
+    'django': 'Django', 'جنگو': 'Django',
+    'flask': 'Flask', 'typescript': 'TypeScript',
+    'react': 'React', 'ری‌اکت': 'React',
+    'vue': 'Vue.js', 'node.js': 'Node.js', 'نود': 'Node.js',
+    'جاواسکریپت': 'JavaScript',
+    'javascript': 'JavaScript',
+    'java': 'Java', 'جاوا': 'Java',
+    'spring': 'Spring', 'c#': 'C#',
     'c++': 'C++', '.net': '.NET', 'php': 'PHP',
     'sql': 'SQL', 'mysql': 'MySQL', 'postgresql': 'PostgreSQL',
     'mongodb': 'MongoDB', 'redis': 'Redis', 'docker': 'Docker',
@@ -27,32 +36,46 @@ SKILLS_DICT = {
     'pandas': 'Pandas', 'numpy': 'NumPy', 'scikit': 'Scikit-learn',
     'power bi': 'Power BI', 'tableau': 'Tableau', 'excel': 'Excel',
     # Design
-    'figma': 'Figma', 'photoshop': 'Photoshop', 'ایلوستریتور': 'Illustrator',
-    'illustrator': 'Illustrator', 'ui/ux': 'UI/UX', 'یو‌آی': 'UI/UX',
+    'figma': 'Figma', 'photoshop': 'Photoshop',
+    'ایلوستریتور': 'Illustrator',
+    'illustrator': 'Illustrator', 'ui/ux': 'UI/UX',
+    'یو‌آی': 'UI/UX',
     # Marketing
-    'seo': 'SEO', 'سئو': 'SEO', 'google analytics': 'Google Analytics',
-    'digital marketing': 'Digital Marketing', 'بازاریابی دیجیتال': 'Digital Marketing',
-    'content marketing': 'Content Marketing', 'تولید محتوا': 'Content Creation',
+    'seo': 'SEO', 'سئو': 'SEO',
+    'google analytics': 'Google Analytics',
+    'digital marketing': 'Digital Marketing',
+    'بازاریابی دیجیتال': 'Digital Marketing',
+    'content marketing': 'Content Marketing',
+    'تولید محتوا': 'Content Creation',
     # Other
-    'project management': 'Project Management', 'مدیریت پروژه': 'Project Management',
+    'project management': 'Project Management',
+    'مدیریت پروژه': 'Project Management',
     'agile': 'Agile', 'scrum': 'Scrum', 'jira': 'Jira',
 }
 
+# CJK/Persian skill keys safe for substring matching (multi-char, no false positives)
+_SAFE_SKILL_KEYS = {
+    'پایتون', 'جنگو', 'جاواسکریپت',
+    'ری‌اکت', 'نود', 'جاوا',
+    'ایلوستریتور', 'یو‌آی',
+    'سئو', 'بازاریابی دیجیتال',
+    'تولید محتوا', 'مدیریت پروژه',
+    'یادگیری ماشین', 'یادگیری عمیق',
+    'پردازش زبان طبیعی', 'علم داده',
+}
+
+# Fields use word-boundary matching for Latin keys to avoid false positives
+# Removed: 'وب', 'داده', 'ai', 'ui', 'ux', 'hr', 'data', 'content' (too short, cause false matches)
+# Changed 'طراحی' -> 'طراحی گرافیک' (more specific)
 FIELDS_DICT = {
     'برنامه‌نویسی': 'برنامه‌نویسی و توسعه نرم‌افزار',
     'توسعه وب': 'برنامه‌نویسی و توسعه نرم‌افزار',
-    'وب': 'برنامه‌نویسی و توسعه نرم‌افزار',
     'developer': 'برنامه‌نویسی و توسعه نرم‌افزار',
     'programming': 'برنامه‌نویسی و توسعه نرم‌افزار',
     'software': 'برنامه‌نویسی و توسعه نرم‌افزار',
-    'داده': 'علم داده و هوش مصنوعی',
-    'data': 'علم داده و هوش مصنوعی',
-    'ai': 'علم داده و هوش مصنوعی',
     'هوش مصنوعی': 'علم داده و هوش مصنوعی',
     'machine learning': 'علم داده و هوش مصنوعی',
-    'طراحی': 'طراحی گرافیک و UI/UX',
-    'ui': 'طراحی گرافیک و UI/UX',
-    'ux': 'طراحی گرافیک و UI/UX',
+    'طراحی گرافیک': 'طراحی گرافیک و UI/UX',
     'graphic': 'طراحی گرافیک و UI/UX',
     'بازاریابی': 'بازاریابی و فروش',
     'marketing': 'بازاریابی و فروش',
@@ -62,7 +85,6 @@ FIELDS_DICT = {
     'حسابداری': 'مالی و حسابداری',
     'accounting': 'مالی و حسابداری',
     'منابع انسانی': 'منابع انسانی',
-    'hr': 'منابع انسانی',
     'مدیریت': 'مدیریت و رهبری',
     'management': 'مدیریت و رهبری',
     'شبکه': 'شبکه و زیرساخت',
@@ -71,33 +93,52 @@ FIELDS_DICT = {
     'امنیت': 'امنیت سایبری',
     'security': 'امنیت سایبری',
     'محتوا': 'تولید محتوا و کپی‌رایتینگ',
-    'content': 'تولید محتوا و کپی‌رایتینگ',
 }
 
-CATEGORY_LABELS = [
-    'برنامه‌نویسی و توسعه نرم‌افزار',
-    'علم داده و هوش مصنوعی',
-    'طراحی گرافیک و UI/UX',
-    'بازاریابی و فروش',
-    'مالی و حسابداری',
-    'منابع انسانی',
-    'مدیریت و رهبری',
-    'شبکه و زیرساخت',
-    'DevOps و زیرساخت',
-    'امنیت سایبری',
-    'تولید محتوا و کپی‌رایتینگ',
-    'مهندسی صنایع',
-    'مهندسی مکانیک',
-    'مهندسی برق',
-    'پزشکی و سلامت',
-    'آموزش',
-    'حقوق و وکالت',
-    'سایر',
-]
+# CJK/Persian field keys safe for substring matching
+_FIELDS_SAFE_KEYS = {
+    'برنامه‌نویسی', 'توسعه وب',
+    'هوش مصنوعی', 'طراحی گرافیک',
+    'بازاریابی', 'فروش',
+    'مالی', 'حسابداری',
+    'منابع انسانی', 'مدیریت',
+    'شبکه', 'امنیت', 'محتوا',
+}
 
 
 _classifier = None
-_tokenizer = None
+
+
+def _match_key(text: str, key: str, safe_keys: set) -> bool:
+    """Match key in text.
+
+    - For CJK/Persian multi-char keys (in safe_keys): substring match
+    - For ASCII/Latin keys: word-boundary regex match
+    """
+    key_lower = key.lower()
+    if key_lower in safe_keys:
+        return key_lower in text.lower()
+    if key_lower.isascii():
+        return bool(re.search(r'\b' + re.escape(key_lower) + r'\b', text.lower()))
+    return key_lower in text.lower()
+
+
+def extract_skills(text: str) -> list:
+    """Extract skills from resume text using word-boundary matching."""
+    found = set()
+    for key, skill_name in SKILLS_DICT.items():
+        if _match_key(text, key, _SAFE_SKILL_KEYS):
+            found.add(skill_name)
+    return sorted(list(found))
+
+
+def extract_fields(text: str) -> list:
+    """Extract job fields from resume text using word-boundary matching."""
+    found = set()
+    for key, field_name in FIELDS_DICT.items():
+        if _match_key(text, key, _FIELDS_SAFE_KEYS):
+            found.add(field_name)
+    return sorted(list(found))
 
 
 def get_classifier():
@@ -117,42 +158,19 @@ def get_classifier():
     return _classifier
 
 
-def extract_skills(text: str) -> list:
-    """Extract skills from resume text using dictionary matching."""
-    found = set()
-    text_lower = text.lower()
-    for key, skill_name in SKILLS_DICT.items():
-        if key.lower() in text_lower:
-            found.add(skill_name)
-    return sorted(list(found))
-
-
-def extract_fields(text: str) -> list:
-    """Extract job fields from resume text."""
-    found = set()
-    text_lower = text.lower()
-    for key, field_name in FIELDS_DICT.items():
-        if key.lower() in text_lower:
-            found.add(field_name)
-    return sorted(list(found))
-
-
 def classify_resume(text: str) -> dict:
     """
     Classify resume into a job category.
     Uses rule-based approach enhanced with BERT if available.
     Returns: {category, confidence, skills, fields}
     """
-    # Extract skills and fields first (rule-based, very reliable)
     skills = extract_skills(text)
     fields = extract_fields(text)
 
-    # Determine category from fields
     category = 'سایر'
     confidence = 0.3
 
     if fields:
-        # Count field occurrences to pick the most relevant
         field_counts = {}
         for f in fields:
             field_counts[f] = field_counts.get(f, 0) + 1
@@ -163,13 +181,11 @@ def classify_resume(text: str) -> dict:
     clf = get_classifier()
     if clf and clf != 'unavailable':
         try:
-            # Use first 512 chars for BERT
             snippet = text[:512]
             results = clf(snippet)
             if results and isinstance(results, list) and len(results) > 0:
                 bert_label = results[0]
                 if isinstance(bert_label, dict):
-                    # BERT gives us sentiment; we use it to boost confidence
                     bert_conf = bert_label.get('score', 0)
                     confidence = min(0.98, confidence + bert_conf * 0.1)
         except Exception:
@@ -209,12 +225,8 @@ def classify_resume(text: str) -> dict:
 def suggest_search_keywords(text: str, skills: list, fields: list) -> str:
     """Generate optimal search keywords from resume analysis."""
     keywords = []
-
     if fields:
         keywords.append(fields[0])
-
-    # Add top skills as keywords
     for skill in skills[:5]:
         keywords.append(skill)
-
     return ' '.join(keywords)

@@ -62,8 +62,16 @@ SENIORITY_MAP = {
 
 API_TIMEOUT = 25
 
-_session = requests.Session()
-_session.headers.update(HEADERS)
+_session = None
+
+
+def _get_session():
+    """Create or return thread-safe session."""
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        _session.headers.update(HEADERS)
+    return _session
 
 
 def _parse_salary(job_data: dict) -> str:
@@ -308,12 +316,13 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                         cat_title = cat.get('title_farsi', '') or cat.get('title', '')
                         if cat_title:
                             skills.append(cat_title)
-                # Extract skills mentioned in description
+                # Extract skills from description
                 desc_html = (job.get('role_description_farsi', '') or
                             job.get('role_description', '') or '')
-                desc_text = _extract_skills_from_desc(desc_html)
-                if desc_text:
-                    skills.append(desc_text)
+                desc_skills = _extract_skills_from_desc(desc_html)
+                if desc_skills:
+                    skills.append(desc_skills)
+                desc_text = ' '.join(desc_skills) if desc_skills else ''
 
                 # Build URL
                 slug = job.get('slug', '')

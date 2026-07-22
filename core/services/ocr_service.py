@@ -1,9 +1,27 @@
 import pytesseract
 import logging
-from PIL import Image
 import os
+from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+
+def _get_available_langs():
+    """Check which Tesseract languages are available, return best lang string."""
+    try:
+        from subprocess import run, PIPE
+        result = run(['tesseract', '--list-langs'], capture_output=True, text=True, timeout=5)
+        available = set(result.stdout.strip().split('\n')[1:])  # skip header line
+        if 'fas' in available:
+            return 'fas+ara+eng'
+        elif 'ara' in available:
+            return 'ara+eng'
+        else:
+            logger.warning("OCR: Persian language pack not found. Install tesseract-ocr-fa for better results.")
+            return 'eng'
+    except Exception as e:
+        logger.warning(f"OCR: could not detect languages: {e}")
+        return 'eng'
 
 
 def _setup_tesseract():
@@ -15,7 +33,7 @@ def _setup_tesseract():
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
             logger.info(f"Tesseract configured: {tesseract_cmd}")
         else:
-            logger.warning(f"Tesseract path not found, using system default")
+            logger.warning("Tesseract path not found, using system default")
     except Exception as e:
         logger.warning(f"Could not configure Tesseract path: {e}")
 
@@ -38,7 +56,7 @@ def extract_text_from_image(image_path: str) -> str:
     try:
         logger.info(f"OCR: processing image {image_path}")
         img = Image.open(image_path)
-        text = pytesseract.image_to_string(img, lang='fas+ara+eng')
+        text = pytesseract.image_to_string(img, lang=_get_available_langs())
         result = text.strip()
         logger.info(f"OCR: extracted {len(result)} chars from image")
         return result
@@ -87,7 +105,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         logger.info(f"OCR: converting PDF to images with Tesseract (poppler={poppler_path or 'not found'})")
         images = pdf2image.convert_from_path(pdf_path, **kwargs)
         for i, img in enumerate(images):
-            text = pytesseract.image_to_string(img, lang='fas+ara+eng')
+            text = pytesseract.image_to_string(img, lang=_get_available_langs())
             text_parts.append(text.strip())
             logger.info(f"OCR: Tesseract page {i+1}: extracted {len(text.strip())} chars")
 

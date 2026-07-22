@@ -1,10 +1,8 @@
-import json
 import logging
 import traceback
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST, require_GET
@@ -162,8 +160,8 @@ def search_config(request, resume_id):
             })
 
         if form.is_valid():
-            # Build keywords from selected categories + custom input
-            cat_keywords = _build_category_keywords(selected_cats)
+            # Build client-side filter keywords from selected categories
+            client_filter_kw = _build_client_filter_keywords(selected_cats)
             custom_kw = form.cleaned_data.get('custom_keywords', '')
 
             search = JobSearch.objects.create(
@@ -409,6 +407,7 @@ def search_results(request, search_id):
 
     # Pagination (20 per page)
     from django.core.paginator import Paginator
+    total_count_before_pagination = listings.count()
     paginator = Paginator(listings, 20)
     page_number = request.GET.get('page', 1)
     try:
@@ -438,7 +437,7 @@ def search_results(request, search_id):
         'search': search,
         'resume': search.resume,
         'listings': listings,
-        'total_count': listings.count(),
+        'total_count': total_count_before_pagination,
         'platform_filter': platform_filter,
         'city_filter': city_filter,
         'level_filter': level_filter,
