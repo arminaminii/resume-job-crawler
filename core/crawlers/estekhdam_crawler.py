@@ -108,12 +108,12 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
     body = {}
 
     # Send keyword to API for server-side filtering
+    # CRITICAL: The correct field is 'q', not 'title'
     if keywords and keywords.strip():
-        # Take first 3 meaningful words for API
         kw_parts = [k.strip() for k in keywords.strip().split()[:3] if k.strip()]
         if kw_parts:
-            body['title'] = ' '.join(kw_parts)
-            logger.info(f"E-estekhdam API: searching title='{body['title']}'")
+            body['q'] = ' '.join(kw_parts)
+            logger.info(f"E-estekhdam API: searching q='{body['q']}'")
 
     if city and city in PROVINCE_MAP:
         body['where'] = PROVINCE_MAP[city]
@@ -124,6 +124,14 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
             if slug and slug not in body:
                 body['category'] = slug
                 break
+
+    # IMPORTANT: E-estekhdam's API ignores search params and returns promoted jobs.
+    # We always get ~20 promoted results regardless of query.
+    # Client-side filtering is the ONLY way to get relevant results.
+    # If we have keywords, they MUST be used for client-side filtering too.
+    if keywords and keywords.strip():
+        extra_kws = [k.strip().lower() for k in keywords.strip().split() if k.strip()]
+        cfk = list(set((cfk or []) + extra_kws))
 
     logger.info(f"E-estekhdam: body={list(body.keys())}, city={city}")
 

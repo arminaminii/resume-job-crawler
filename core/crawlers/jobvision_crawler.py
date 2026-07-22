@@ -62,9 +62,8 @@ PROVINCE_SLUGS = {
     'قم': 'in-all-cities-of-ghom',
 }
 
-LEVEL_MAP = {
-    'junior': 2, 'mid': 3, 'senior': 4, 'manager': 5, 'all': 0,
-}
+# NOTE: API ignores seniorityLevelIds in filters — only title-based client filter works.
+# Actual API seniority IDs vary (e.g. 97=کارشناس, 172=کارشناس ارشد), not 2-5.
 
 API_TIMEOUT = 25
 
@@ -94,23 +93,29 @@ def _job_matches_client_filter(job: dict, client_kws: list) -> bool:
 
 
 def _job_matches_level(job: dict, level: str) -> bool:
-    """Check seniority level match."""
+    """Check seniority level match using TITLE-based matching only.
+    
+    The API ignores seniorityLevelIds in filters, so we filter client-side.
+    Actual seniority titles from API: کارآموز, کارشناس, کارشناس ارشد, مدیر, etc.
+    """
     if not level or level == 'all':
         return True
     seniority = job.get('seniorityLevel') or {}
-    title = (seniority.get('titleFa', '') or seniority.get('titleEn', '')).lower()
-    lid = seniority.get('id', 0)
+    title_fa = (seniority.get('titleFa', '') or '').lower()
+    title_en = (seniority.get('titleEn', '') or '').lower()
+    title = f"{title_fa} {title_en}"
+    if not title.strip():
+        return True  # Can't filter without data
     lm = {
-        'junior': [2, 'کارآموز', 'جونیور', 'مبتدی', 'کارآموزی'],
-        'mid': [3, 'متوسط', 'میان‌رده', 'mid'],
-        'senior': [4, 'ارشد', 'سنیور', 'senior'],
-        'manager': [5, 'مدیر', 'manager', 'مدیریتی'],
+        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی', 'junior', 'intern', 'trainee', 'entry'],
+        'mid': ['کارشناس', 'متخصص', 'میان‌رده', 'mid', 'intermediate'],
+        'senior': ['ارشد', 'سنیور', 'senior', 'lead', 'expert', 'principal', 'کارشناس ارشد', 'تخصص بالا'],
+        'manager': ['مدیر', 'manager', 'director', 'head', 'vp', 'مدیریتی', 'سرپرست', 'رئیس'],
     }
     criteria = lm.get(level, [])
     if not criteria:
         return True
-    return (any(isinstance(c, int) and c == lid for c in criteria) or
-            any(isinstance(c, str) and c in title for c in criteria))
+    return any(c in title for c in criteria)
 
 
 def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
@@ -127,15 +132,14 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
     seen_ids = set()
     cfk = client_filter_keywords or []
 
-    # --- Build API filters ---
+    # --- Build API payload ---
+    # CRITICAL: keyword MUST be top-level, NOT inside filters!
+    # The API ignores keyword inside filters.
+    clean_kw = ' '.join(keywords.strip().split()[:5]) if keywords and keywords.strip() else ''
+
     filters = {}
 
-    # Only send keyword if user explicitly typed something
-    clean_kw = ' '.join(keywords.strip().split()[:5]) if keywords and keywords.strip() else ''
-    if clean_kw:
-        filters['keyword'] = clean_kw
-
-    # Category slugs — PRIMARY filtering mechanism
+    # Category slugs — server-side filtering
     if category_slugs:
         unique = list(set(s for s in category_slugs if s))
         if unique:
@@ -145,10 +149,7 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
     if city and city in PROVINCE_SLUGS:
         filters['locationSlugs'] = [PROVINCE_SLUGS[city]]
 
-    if level and level != 'all' and level in LEVEL_MAP:
-        lid = LEVEL_MAP[level]
-        if lid > 0:
-            filters['seniorityLevelIds'] = [lid]
+    # Note: API ignores seniorityLevelIds — level filtering done client-side only
 
     if time_range and time_range != 'all':
         try:
@@ -174,6 +175,9 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
                 "sort": 1,
                 "filters": filters,
             }
+            # keyword goes at TOP-LEVEL, not inside filters
+            if clean_kw:
+                payload['keyword'] = clean_kw
             resp = session.post(LIST_API, json=payload, timeout=API_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
