@@ -394,7 +394,12 @@ def search_results(request, search_id):
     if city_filter:
         listings = listings.filter(city__icontains=city_filter)
     if level_filter:
-        listings = listings.filter(seniority_level__icontains=level_filter)
+        # Map English level to Persian keywords for DB search
+        fa_kw = LEVEL_EN_TO_FA.get(level_filter, '')
+        if fa_kw:
+            listings = listings.filter(seniority_level__icontains=fa_kw)
+        else:
+            listings = listings.filter(seniority_level__icontains=level_filter)
     if keyword_filter:
         from django.db.models import Q
         listings = listings.filter(
@@ -416,9 +421,23 @@ def search_results(request, search_id):
     listings = page_obj
 
     # Get unique values for filters (from ALL listings, not just current page)
-    platforms = search.listings.values_list('platform', flat=True).distinct()
-    cities = search.listings.values_list('city', flat=True).distinct()
-    levels = search.listings.values_list('seniority_level', flat=True).distinct()
+    # Group by platform and city with counts for proper sidebar display
+    from django.db.models import Count
+    platform_counts = list(
+        search.listings.values('platform')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    city_counts = list(
+        search.listings.exclude(city='').values('city')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    # Level filter: map English filter values to Persian for DB matching
+    LEVEL_EN_TO_FA = {
+        'junior': 'کارآموز', 'mid': 'کارشناس',
+        'senior': 'ارشد', 'manager': 'مدیر',
+    }
 
     PLATFORM_NAMES = {
         'jobvision': 'جاب‌ویژن',
@@ -441,9 +460,8 @@ def search_results(request, search_id):
         'city_filter': city_filter,
         'level_filter': level_filter,
         'keyword_filter': keyword_filter,
-        'platforms': platforms,
-        'cities': [c for c in cities if c],
-        'levels': [l for l in levels if l],
+        'platform_counts': platform_counts,
+        'city_counts': city_counts,
         'platform_names': PLATFORM_NAMES,
         'selected_cat_names': selected_cat_names,
         'page_obj': page_obj,

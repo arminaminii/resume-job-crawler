@@ -330,17 +330,9 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                 if not _job_matches_level(seniority_data, level):
                     continue
 
-                # Combined keyword filtering (OR logic: match ANY of user keywords OR category keywords)
-                all_filter_kws = []
-                if keywords and keywords.strip():
-                    all_filter_kws.extend([k.strip().lower() for k in keywords.split() if k.strip()])
-                if cfk:
-                    all_filter_kws.extend([kw.lower() for kw in cfk])
-
-                if all_filter_kws:
-                    combined_all = f"{title} {company} {' '.join(str(s) for s in skills)} {desc_text}".lower()
-                    if not any(term in combined_all for term in all_filter_kws):
-                        continue
+                # Note: Do NOT apply client_filter_keywords here.
+                # IranTalent API already filters by keyword server-side.
+                # Applying client filter on top would double-filter and return 0 results.
 
                 page_matched += 1
 

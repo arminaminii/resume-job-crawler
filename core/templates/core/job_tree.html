@@ -109,7 +109,7 @@
                                     مسیر پیشرفت
                                 </div>
                                 <div class="jf-tree-path">
-                                    {% for step in cat.career_path.split:' >' %}
+                                    {% for step in cat.career_path|split_path %}
                                     <span class="jf-tree-path-step">{{ step.strip }}</span>
                                     {% if not forloop.last %}<span class="jf-tree-path-arrow">→</span>{% endif %}
                                     {% endfor %}

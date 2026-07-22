@@ -51,20 +51,21 @@
             </h3>
             <form method="get" id="filterForm">
                 <!-- Platform -->
-                {% if platforms %}
+                {% if platform_counts %}
                 <div class="jf-filter-section">
                     <div class="jf-filter-section-title">سامانه</div>
                     <div class="jf-filter-options">
                         <label class="jf-radio-label">
                             <input type="radio" name="platform" value="" {% if not platform_filter %}checked{% endif %} onchange="this.form.submit()">
                             <span class="jf-radio-custom"></span>
-                            همه
+                            همه ({{ total_count }})
                         </label>
-                        {% for p in platforms %}
+                        {% for p in platform_counts %}
                         <label class="jf-radio-label">
-                            <input type="radio" name="platform" value="{{ p }}" {% if platform_filter == p %}checked{% endif %} onchange="this.form.submit()">
+                            <input type="radio" name="platform" value="{{ p.platform }}" {% if platform_filter == p.platform %}checked{% endif %} onchange="this.form.submit()">
                             <span class="jf-radio-custom"></span>
-                            {{ platform_names|get_item:p|default:p }}
+                            {{ platform_names|get_item:p.platform }}
+                            <span class="jf-filter-count">{{ p.count }}</span>
                         </label>
                         {% endfor %}
                     </div>
@@ -72,30 +73,58 @@
                 {% endif %}
 
                 <!-- City -->
-                {% if cities %}
+                {% if city_counts %}
                 <div class="jf-filter-section">
                     <div class="jf-filter-section-title">شهر</div>
-                    <select name="city" class="jf-select jf-select-sm" onchange="this.form.submit()">
-                        <option value="">همه شهرها</option>
-                        {% for c in cities %}
-                        <option value="{{ c }}" {% if city_filter == c %}selected{% endif %}>{{ c }}</option>
+                    <div class="jf-filter-options">
+                        <label class="jf-radio-label">
+                            <input type="radio" name="city" value="" {% if not city_filter %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            همه شهرها
+                        </label>
+                        {% for c in city_counts|slice:":10" %}
+                        <label class="jf-radio-label">
+                            <input type="radio" name="city" value="{{ c.city }}" {% if city_filter == c.city %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            {{ c.city }}
+                            <span class="jf-filter-count">{{ c.count }}</span>
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
                 {% endif %}
 
                 <!-- Level -->
-                {% if levels %}
                 <div class="jf-filter-section">
                     <div class="jf-filter-section-title">سطح</div>
-                    <select name="level" class="jf-select jf-select-sm" onchange="this.form.submit()">
-                        <option value="">همه سطوح</option>
-                        {% for l in levels %}
-                        <option value="{{ l }}" {% if level_filter == l %}selected{% endif %}>{{ l }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="jf-filter-options">
+                        <label class="jf-radio-label">
+                            <input type="radio" name="level" value="" {% if not level_filter %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            همه سطوح
+                        </label>
+                        <label class="jf-radio-label">
+                            <input type="radio" name="level" value="junior" {% if level_filter == 'junior' %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            جونیور / کارآموز
+                        </label>
+                        <label class="jf-radio-label">
+                            <input type="radio" name="level" value="mid" {% if level_filter == 'mid' %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            می‌لول
+                        </label>
+                        <label class="jf-radio-label">
+                            <input type="radio" name="level" value="senior" {% if level_filter == 'senior' %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            سنیور / ارشد
+                        </label>
+                        <label class="jf-radio-label">
+                            <input type="radio" name="level" value="manager" {% if level_filter == 'manager' %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="jf-radio-custom"></span>
+                            مدیر
+                        </label>
+                    </div>
                 </div>
-                {% endif %}
 
                 <!-- Search -->
                 <div class="jf-filter-section">
