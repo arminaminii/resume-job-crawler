@@ -309,58 +309,48 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     """
     Execute the job search across all selected platforms.
 
-    KEY DESIGN: keyword handling is separated:
-    - user_keywords: only the user's explicit custom input → sent to API
-    - auto_keywords: generated from resume by BERT → sent to API as supplement
-    - category_filter_kw: skills/positions from selected categories → CLIENT-SIDE only
+    KEY DESIGN: Uses SkillMapper for platform-specific keyword generation.
+    Each platform gets OPTIMIZED keywords and category slugs based on:
+    1. Category's per-platform slugs (jobvision_slug, irantalent_slug, etc.)
+    2. Skill aliases mapped to each platform's terminology
+    3. User's custom keywords as top priority
 
-    This avoids the critical bug where categorySlugs + keyword created an
-    AND filter that returned zero results.
+    Fallback chain for keywords:
+    - User custom keywords → SkillMapper aliases → Category keywords_en → Category skills
     """
-    # Build API keywords: ONLY user's custom + auto from resume (NOT category-derived)
-    api_keywords_parts = []
-    if search.custom_keywords:
-        api_keywords_parts.append(search.custom_keywords)
-    if auto_keywords:
-        api_keywords_parts.append(auto_keywords)
-    api_keywords = ' '.join(api_keywords_parts)
+    from .services.skill_mapper import SkillMapper
 
+    selected_cats = search.selected_categories or []
+    resume_skills = search.resume.extracted_skills or []
+    resume_text = search.resume.full_text or ''
+
+    # Build SkillMapper from categories + resume + custom input
+    mapper = SkillMapper.from_search(
+        selected_slugs=selected_cats,
+        custom_keywords=search.custom_keywords,
+        resume_skills=resume_skills,
+        resume_text=resume_text,
+    )
+
+    debug_info = mapper.get_debug_info()
     logger.info(f"Running search #{search.id}: platforms={search.platforms}, "
-                f"api_keywords='{api_keywords[:80]}', city={search.city}, "
-                f"client_filter_keywords={len(category_filter_kw)} terms")
+                f"mapper={debug_info['platform_keywords']}")
 
     all_results = []
     status_messages = []
 
-    # Get selected categories for platform-specific slug mapping
-    selected_cats = search.selected_categories or []
-    jobvision_cats = list(JobCategory.objects.filter(
-        slug__in=selected_cats, is_active=True
-    ).values_list('jobvision_slug', flat=True).distinct())
-    # Filter out empty slugs
-    jobvision_cats = [s for s in jobvision_cats if s]
-
-    estekhdam_cats = list(JobCategory.objects.filter(
-        slug__in=selected_cats, is_active=True
-    ).values_list('estekhdam_slug', flat=True).distinct())
-    estekhdam_cats = [s for s in estekhdam_cats if s]
-
-    irantalent_cats = list(JobCategory.objects.filter(
-        slug__in=selected_cats, is_active=True
-    ).values_list('irantalent_slug', flat=True).distinct())
-    irantalent_cats = [s for s in irantalent_cats if s]
-
     # --- Jobvision (requests-based, fast REST API) ---
     if 'jobvision' in search.platforms:
         from .crawlers.jobvision_crawler import crawl_jobvision
+        jv_query = mapper.get_query('jobvision')
         results, msg = _run_crawler_safe(
             crawl_jobvision, 'جاب‌ویژن',
-            keywords=api_keywords,
+            keywords=jv_query['keywords'],
             city=search.city,
             level=search.level,
             time_range=search.time_range,
             max_pages=3,
-            category_slugs=jobvision_cats,
+            category_slugs=jv_query['category_slugs'],
             client_filter_keywords=category_filter_kw,
         )
         all_results.extend(results)
@@ -369,25 +359,27 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     # --- E-estekhdam (REST API) ---
     if 'e_estekhdam' in search.platforms:
         from .crawlers.estekhdam_crawler import crawl_estekhdam
+        ee_query = mapper.get_query('e_estekhdam')
         results, msg = _run_crawler_safe(
             crawl_estekhdam, 'ای‌استخدام',
-            keywords=api_keywords,
+            keywords=ee_query['keywords'],
             city=search.city,
             level=search.level,
             time_range=search.time_range,
             max_pages=3,
-            category_slugs=estekhdam_cats,
+            category_slugs=ee_query['category_slugs'],
             client_filter_keywords=category_filter_kw,
         )
         all_results.extend(results)
         status_messages.append(msg)
 
-    # --- IranTalent (Playwright) ---
+    # --- IranTalent (REST API) ---
     if 'irantalent' in search.platforms:
         from .crawlers.irantalent_crawler import crawl_irantalent
+        it_query = mapper.get_query('irantalent')
         results, msg = _run_crawler_safe(
             crawl_irantalent, 'ایران‌تلنت',
-            keywords=api_keywords,
+            keywords=it_query['keywords'],
             city=search.city,
             level=search.level,
             time_range=search.time_range,
