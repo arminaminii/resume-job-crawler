@@ -156,10 +156,13 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
 
     if time_range and time_range != 'all':
         try:
-            from datetime import datetime, timedelta
+            from datetime import datetime, timedelta, timezone
             days = int(time_range)
-            cutoff = datetime.now() - timedelta(days=days)
+            # Use UTC+3:30 (Iran timezone) for correct cutoff
+            iran_tz = timezone(timedelta(hours=3, minutes=30))
+            cutoff = datetime.now(iran_tz) - timedelta(days=days)
             filters['publishedDateGte'] = int(cutoff.timestamp() * 1000)
+            logger.info(f"Jobvision: time filter {days} days, cutoff ts={filters['publishedDateGte']}")
         except (ValueError, TypeError):
             pass
 

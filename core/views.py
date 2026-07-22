@@ -348,6 +348,7 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
             level=search.level,
             time_range=search.time_range,
             max_pages=3,
+            category_slugs=it_query['category_slugs'],
             client_filter_keywords=category_filter_kw,
         )
         all_results.extend(results)
@@ -378,6 +379,20 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     return status_messages
 
 
+LEVEL_EN_TO_FA = {
+    'junior': ['کارآموز', 'جونیور', 'مبتدی'],
+    'mid': ['کارشناس', 'متخصص', 'میان‌رده'],
+    'senior': ['ارشد', 'سنیور', 'کارشناس ارشد'],
+    'manager': ['مدیر', 'مدیریتی', 'سرپرست', 'رئیس'],
+}
+
+PLATFORM_NAMES = {
+    'jobvision': 'جاب‌ویژن',
+    'e_estekhdam': 'ای‌استخدام',
+    'irantalent': 'ایران‌تلنت',
+}
+
+
 def search_results(request, search_id):
     """Display search results with filtering and pagination."""
     search = get_object_or_404(JobSearch, pk=search_id)
@@ -395,9 +410,13 @@ def search_results(request, search_id):
         listings = listings.filter(city__icontains=city_filter)
     if level_filter:
         # Map English level to Persian keywords for DB search
-        fa_kw = LEVEL_EN_TO_FA.get(level_filter, '')
-        if fa_kw:
-            listings = listings.filter(seniority_level__icontains=fa_kw)
+        fa_kws = LEVEL_EN_TO_FA.get(level_filter, [])
+        if fa_kws:
+            from django.db.models import Q
+            q_objects = Q(**{'seniority_level__icontains': fa_kws[0]})
+            for kw in fa_kws[1:]:
+                q_objects |= Q(**{'seniority_level__icontains': kw})
+            listings = listings.filter(q_objects)
         else:
             listings = listings.filter(seniority_level__icontains=level_filter)
     if keyword_filter:
@@ -433,17 +452,6 @@ def search_results(request, search_id):
         .annotate(count=Count('id'))
         .order_by('-count')
     )
-    # Level filter: map English filter values to Persian for DB matching
-    LEVEL_EN_TO_FA = {
-        'junior': 'کارآموز', 'mid': 'کارشناس',
-        'senior': 'ارشد', 'manager': 'مدیر',
-    }
-
-    PLATFORM_NAMES = {
-        'jobvision': 'جاب‌ویژن',
-        'e_estekhdam': 'ای‌استخدام',
-        'irantalent': 'ایران‌تلنت',
-    }
 
     # Get selected category names for display
     selected_cat_names = []

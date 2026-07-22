@@ -4,25 +4,30 @@ IranTalent crawler — uses their PUBLIC REST API.
 API endpoint: POST https://api.irantalent.com/api/v1/employer/position/search-by-slug
 Returns paginated JSON with job listings.
 
-DISCOVERY: IranTalent is an Angular SPA, but has a hidden REST API for job search.
-The website sends POST requests with {"keyword": "..."} and optionally
-{"keyword": "...", "location_slugs": ["tehran"]} for city filtering.
+KEY INSIGHTS:
+1. The endpoint name is 'search-by-slug' — it accepts a 'slug' param for category filtering
+2. 'keyword' is for text search within/beside the category
+3. 'location_slugs' for city filtering
+4. 'created_at' field enables client-side time filtering
+5. Seniority is a LIST: [{'title_farsi': 'کارشناس', 'title': 'Junior Professional'}]
 
 RESPONSE STRUCTURE (data.data[i]):
   - title / title_farsi: job title
-  - brand_data: company info (name_fa, name_en, logo_url, company_size, industry)
-  - location_text: location string
-  - seniority: seniority info
-  - employment_type: job type
+  - brand_data / employer: company info
+  - location: city/province dict
+  - seniority: list of seniority dicts
+  - employment_type: job type dict
   - salary_from / salary_to: salary range
   - slug: for URL construction
   - role_description: HTML job description
-  - created_at: posted date
+  - created_at: ISO datetime string
   - is_remote: remote flag
+  - job_category: list of category dicts
 """
 import requests
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +60,16 @@ CITY_SLUGS = {
 
 SENIORITY_MAP = {
     'junior': ['Junior', 'Intern', 'Trainee', 'Entry Level', 'کارآموز', 'جونیور'],
-    'mid': ['Mid-Level', 'Mid Level', 'Intermediate', 'متوسط', 'میان‌رده'],
-    'senior': ['Senior', 'Lead', 'Expert', 'Principal', 'ارشد', 'سنیور'],
+    'mid': ['Mid-Level', 'Mid Level', 'Intermediate', 'متوسط', 'میان‌رده', 'کارشناس'],
+    'senior': ['Senior', 'Lead', 'Expert', 'Principal', 'ارشد', 'سنیور', 'کارشناس ارشد'],
     'manager': ['Manager', 'Director', 'Head', 'VP', 'مدیر', 'سرپرست'],
 }
 
 API_TIMEOUT = 25
+
+
+# Iran timezone (UTC+3:30)
+IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 
 def _get_session():
@@ -124,20 +133,79 @@ def _parse_employment_type(emp_type: dict) -> str:
     return emp_type.get('title', '') or emp_type.get('title_farsi', '') or ''
 
 
-def _parse_location(location_data: dict) -> str:
-    """Parse location from API response."""
-    if not location_data:
+def _parse_posted_date(created_at: str) -> str:
+    """Parse ISO datetime to a Persian-friendly relative date string."""
+    if not created_at:
         return ''
-    # location can be a dict with city/province or a string
-    if isinstance(location_data, str):
-        return location_data
-    city = location_data.get('title', '') or location_data.get('title_farsi', '') or ''
-    province = location_data.get('province', {})
-    if isinstance(province, dict):
-        prov_name = province.get('title_farsi', '') or province.get('title', '') or ''
-        if prov_name and prov_name != city:
-            return f"{city}, {prov_name}"
-    return city
+    try:
+        # Handle various ISO formats
+        if 'T' in created_at:
+            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        else:
+            dt = datetime.fromisoformat(created_at)
+        
+        # Make timezone-aware if naive
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=IRAN_TZ)
+        
+        now = datetime.now(IRAN_TZ)
+        diff = now - dt
+        days = diff.days
+        
+        if days < 0:
+            return ''
+        elif days == 0:
+            return 'امروز'
+        elif days == 1:
+            return 'دیروز'
+        elif days < 7:
+            return f'{days} روز پیش'
+        elif days < 30:
+            weeks = days // 7
+            return f'{weeks} هفته پیش'
+        elif days < 365:
+            months = days // 30
+            return f'{months} ماه پیش'
+        else:
+            return f'{days // 365} سال پیش'
+    except (ValueError, TypeError):
+        return created_at[:10] if created_at else ''
+
+
+def _parse_datetime(created_at: str) -> datetime:
+    """Parse ISO datetime to a timezone-aware datetime object for filtering."""
+    if not created_at:
+        return None
+    try:
+        if 'T' in created_at:
+            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        else:
+            dt = datetime.fromisoformat(created_at)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=IRAN_TZ)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
+def _job_matches_time(created_at: str, time_range: str) -> bool:
+    """Check if job's posted date falls within the time range."""
+    if not time_range or time_range == 'all':
+        return True
+    if not created_at:
+        return True  # Can't filter without date
+    
+    try:
+        days = int(time_range)
+    except (ValueError, TypeError):
+        return True
+    
+    dt = _parse_datetime(created_at)
+    if dt is None:
+        return True
+    
+    cutoff = datetime.now(IRAN_TZ) - timedelta(days=days)
+    return dt >= cutoff
 
 
 def _extract_skills_from_desc(role_description: str) -> list:
@@ -186,23 +254,40 @@ def _job_matches_level(seniority_data, level: str) -> bool:
 
 def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                       time_range: str = '7', max_pages: int = 3,
+                      category_slugs: list = None,
                       client_filter_keywords: list = None) -> list:
     """
     Crawl IranTalent via REST API.
 
-    - keywords: user's search terms → sent to API as 'keyword'
-    - city: Persian city name → converted to slug for 'location_slugs'
+    - keywords: user's search terms -> sent to API as 'keyword'
+    - category_slugs: IranTalent category slugs -> sent as 'slug' for category filtering
+    - city: Persian city name -> converted to slug for 'location_slugs'
     - level: seniority level for client-side filtering
+    - time_range: max days ago (client-side filtering)
     - client_filter_keywords: additional category keywords for client-side filtering
+    
+    STRATEGY:
+    1. Send 'slug' (first category slug) for category-based search
+    2. Send 'keyword' (user's terms) for text refinement
+    3. If no slug available, rely solely on keyword search
+    4. Client-side: filter by level, time_range
     """
     results = []
     seen_ids = set()
     cfk = client_filter_keywords or []
+    cat_slugs = category_slugs or []
 
     # Build request body
     body = {}
 
-    # Keyword
+    # CRITICAL: Send 'slug' for category-based search (the endpoint IS search-by-slug)
+    # Use the first category slug if available
+    primary_slug = cat_slugs[0] if cat_slugs else ''
+    if primary_slug:
+        body['slug'] = primary_slug
+        logger.info(f"IranTalent API: slug='{primary_slug}' (category filter)")
+
+    # Keyword — send as text search alongside slug
     if keywords and keywords.strip():
         kw = ' '.join(keywords.strip().split()[:5])
         body['keyword'] = kw
@@ -212,11 +297,11 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
     if city and city in CITY_SLUGS:
         body['location_slugs'] = [CITY_SLUGS[city]]
 
-    logger.info(f"IranTalent: body keys={list(body.keys())}, city={city}")
+    logger.info(f"IranTalent: body keys={list(body.keys())}, city={city}, time_range={time_range}")
 
     for page_num in range(1, max_pages + 1):
         try:
-            # Add page to URL or body
+            # Add page to body
             page_body = dict(body)
             page_body['page'] = page_num
 
@@ -252,6 +337,11 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                     continue
                 seen_ids.add(jid)
 
+                # --- Time filtering (client-side) ---
+                created_at = job.get('created_at', '') or ''
+                if not _job_matches_time(created_at, time_range):
+                    continue
+
                 # --- Extract fields ---
                 title = (job.get('title_farsi', '') or
                          job.get('title', '') or '')
@@ -272,13 +362,12 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                 location_text = (job.get('location_text_farsi', '') or
                                 job.get('location_text', '') or '')
                 city_name = ''
+                province_name = ''
                 if loc_data and isinstance(loc_data, dict):
                     city_name = loc_data.get('title_farsi', '') or loc_data.get('title', '') or ''
                     parent = loc_data.get('parent') or {}
                     province_name = (parent.get('title_farsi', '') or
                                     parent.get('title', '') or '')
-                else:
-                    province_name = ''
                 if not city_name and location_text:
                     city_name = location_text
 
@@ -301,8 +390,8 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                     wt_map = {'on_site': 'حضوری', 'remote': 'دورکاری', 'hybrid': 'ترکیبی'}
                     job_type = wt_map.get(work_type_raw, work_type_raw)
 
-                # Posted date
-                posted_date = job.get('created_at', '') or ''
+                # Posted date (human-readable)
+                posted_date = _parse_posted_date(created_at)
 
                 # Skills — extract from job categories + description
                 skills = []
@@ -324,15 +413,9 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
                 slug = job.get('slug', '')
                 url = f"{BASE_URL}/jobs/{slug}" if slug else f"{BASE_URL}/jobs/{jid}"
 
-                # --- Client-side filtering ---
-
-                # Level filtering
+                # --- Level filtering ---
                 if not _job_matches_level(seniority_data, level):
                     continue
-
-                # Note: Do NOT apply client_filter_keywords here.
-                # IranTalent API already filters by keyword server-side.
-                # Applying client filter on top would double-filter and return 0 results.
 
                 page_matched += 1
 
