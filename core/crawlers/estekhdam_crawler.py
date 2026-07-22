@@ -123,17 +123,16 @@ def crawl_estekhdam(keywords: str = '', city: str = '', level: str = 'all',
     if city and city in PROVINCE_MAP:
         body['where'] = PROVINCE_MAP[city]
 
-    # Try sending category filter if available
-    if category_slugs:
-        for slug in category_slugs:
-            if slug and slug not in body:
-                body['category'] = slug
-                break
+    # IMPORTANT: E-estekhdam's public API ignores most search params and returns
+    # ~20 promoted jobs regardless of query.
+    # Strategy: rely on client_filter_keywords for relevance.
+    # Don't send category to API (it's not a supported param).
+    if keywords and keywords.strip():
+        kw_parts = [k.strip() for k in keywords.strip().split()[:3] if k.strip()]
+        if kw_parts:
+            body['q'] = ' '.join(kw_parts)
 
-    # IMPORTANT: E-estekhdam's API ignores search params and returns promoted jobs.
-    # We always get ~20 promoted results regardless of query.
-    # Client-side filtering is the ONLY way to get relevant results.
-    # If we have keywords, they MUST be used for client-side filtering too.
+    # Always include user keywords + category keywords in client filter
     if keywords and keywords.strip():
         extra_kws = [k.strip().lower() for k in keywords.strip().split() if k.strip()]
         cfk = list(set((cfk or []) + extra_kws))

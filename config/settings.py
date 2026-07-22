@@ -113,9 +113,6 @@ if not POPPLER_PATH:
     if _poppler_bin:
         POPPLER_PATH = os.path.dirname(_poppler_bin)
 
-# BERT Model
-BERT_MODEL_NAME = 'HooshvareLab/bert-fa-base-uncased-sentiment-snappfood'
-
 # Logging
 LOGGING = {
     'version': 1,

@@ -62,16 +62,12 @@ SENIORITY_MAP = {
 
 API_TIMEOUT = 25
 
-_session = None
-
 
 def _get_session():
-    """Create or return thread-safe session."""
-    global _session
-    if _session is None:
-        _session = requests.Session()
-        _session.headers.update(HEADERS)
-    return _session
+    """Create a new requests Session for each call (thread-safe)."""
+    s = requests.Session()
+    s.headers.update(HEADERS)
+    return s
 
 
 def _parse_salary(job_data: dict) -> str:
@@ -224,7 +220,7 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
             page_body = dict(body)
             page_body['page'] = page_num
 
-            resp = _session.post(API_URL, json=page_body, timeout=API_TIMEOUT)
+            resp = _get_session().post(API_URL, json=page_body, timeout=API_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 

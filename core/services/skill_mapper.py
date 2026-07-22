@@ -418,35 +418,56 @@ class SkillMapper:
         return normalized
 
     def _generate_platform_keywords(self):
-        """Generate optimal search keywords for each platform."""
-        # Priority order: positions > keywords_en > skills (most specific first)
-        all_terms = self._all_positions + self._all_keywords_en + self._all_skills
+        """Generate optimal search keywords for each platform.
+        
+        KEY INSIGHT: Jobvision API works best with categorySlugs for server-side
+        filtering. Sending too many keywords causes AND-logic over-filtering.
+        Strategy: send minimal keywords (user's custom only or top 2 skills),
+        and rely on categorySlugs for server-side category filtering.
+        """
+        # Priority order: custom keywords > skills > positions > keywords_en
+        all_terms = self._all_skills + self._all_positions + self._all_keywords_en
         unique_terms = list(OrderedDict.fromkeys(all_terms))
 
         for platform in ['jobvision', 'irantalent', 'e_estekhdam']:
-            # Map each term to its platform-specific alias
-            mapped = []
-            for term in unique_terms[:8]:  # Limit to 8 terms to avoid overly broad search
-                alias = self._get_platform_alias(term, platform)
-                if alias and alias not in mapped:
-                    mapped.append(alias)
+            if platform == 'jobvision' and self._category_slugs.get('jobvision'):
+                # Jobvision: rely on categorySlugs, use minimal keyword
+                # Only use user's custom keywords (or top 2 skills if no custom)
+                if self._custom_keywords:
+                    kw = self._custom_keywords.strip()[:50]
+                else:
+                    # Use top 2 most relevant skills
+                    mapped = []
+                    for term in unique_terms[:5]:
+                        alias = self._get_platform_alias(term, platform)
+                        if alias and alias not in mapped:
+                            mapped.append(alias)
+                        if len(mapped) >= 2:
+                            break
+                    kw = ' '.join(mapped)
+                self._platform_keywords[platform] = kw
+            else:
+                # IranTalent & E-estekhdam: use more keywords (they need text search)
+                mapped = []
+                for term in unique_terms[:6]:
+                    alias = self._get_platform_alias(term, platform)
+                    if alias and alias not in mapped:
+                        mapped.append(alias)
 
-            # Also add custom keywords
-            if self._custom_keywords:
-                mapped.insert(0, self._custom_keywords)
+                # Also add custom keywords at front
+                if self._custom_keywords:
+                    mapped.insert(0, self._custom_keywords)
 
-            # Join into a single search string (max 5 words for best API results)
-            all_words = ' '.join(mapped).split()
-            # Deduplicate words while preserving order
-            seen = set()
-            deduped = []
-            for w in all_words:
-                w_lower = w.lower()
-                if w_lower not in seen:
-                    seen.add(w_lower)
-                    deduped.append(w)
-            
-            self._platform_keywords[platform] = ' '.join(deduped[:6])
+                # Join and deduplicate words
+                all_words = ' '.join(mapped).split()
+                seen = set()
+                deduped = []
+                for w in all_words:
+                    w_lower = w.lower()
+                    if w_lower not in seen:
+                        seen.add(w_lower)
+                        deduped.append(w)
+                self._platform_keywords[platform] = ' '.join(deduped[:5])
 
         logger.info(f"SkillMapper generated keywords:")
         for p, kw in self._platform_keywords.items():

@@ -106,9 +106,6 @@ _FIELDS_SAFE_KEYS = {
 }
 
 
-_classifier = None
-
-
 def _match_key(text: str, key: str, safe_keys: set) -> bool:
     """Match key in text.
 
@@ -119,6 +116,7 @@ def _match_key(text: str, key: str, safe_keys: set) -> bool:
     if key_lower in safe_keys:
         return key_lower in text.lower()
     if key_lower.isascii():
+        import re
         return bool(re.search(r'\b' + re.escape(key_lower) + r'\b', text.lower()))
     return key_lower in text.lower()
 
@@ -141,27 +139,8 @@ def extract_fields(text: str) -> list:
     return sorted(list(found))
 
 
-def get_classifier():
-    """Lazy-load BERT classifier."""
-    global _classifier
-    if _classifier is None:
-        try:
-            from transformers import pipeline
-            _classifier = pipeline(
-                'text-classification',
-                model='HooshvareLab/bert-fa-base-uncased-sentiment-snappfood',
-                tokenizer='HooshvareLab/bert-fa-base-uncased-sentiment-snappfood',
-                top_k=None,
-            )
-        except Exception:
-            _classifier = 'unavailable'
-    return _classifier
-
-
 def classify_resume(text: str) -> dict:
-    """
-    Classify resume into a job category.
-    Uses rule-based approach enhanced with BERT if available.
+    """Classify resume into a job category using rule-based approach.
     Returns: {category, confidence, skills, fields}
     """
     skills = extract_skills(text)
@@ -176,20 +155,6 @@ def classify_resume(text: str) -> dict:
             field_counts[f] = field_counts.get(f, 0) + 1
         category = max(field_counts, key=field_counts.get)
         confidence = min(0.95, 0.5 + len(skills) * 0.05)
-
-    # Try BERT classification as enhancement
-    clf = get_classifier()
-    if clf and clf != 'unavailable':
-        try:
-            snippet = text[:512]
-            results = clf(snippet)
-            if results and isinstance(results, list) and len(results) > 0:
-                bert_label = results[0]
-                if isinstance(bert_label, dict):
-                    bert_conf = bert_label.get('score', 0)
-                    confidence = min(0.98, confidence + bert_conf * 0.1)
-        except Exception:
-            pass
 
     # Fallback: use skills to infer category
     if category == 'سایر' and skills:

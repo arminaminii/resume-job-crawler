@@ -161,7 +161,6 @@ def search_config(request, resume_id):
 
         if form.is_valid():
             # Build client-side filter keywords from selected categories
-            client_filter_kw = _build_client_filter_keywords(selected_cats)
             custom_kw = form.cleaned_data.get('custom_keywords', '')
 
             search = JobSearch.objects.create(
