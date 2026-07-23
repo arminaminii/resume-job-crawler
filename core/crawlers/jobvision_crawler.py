@@ -87,19 +87,31 @@ def _job_matches_level(job: dict, level: str) -> bool:
     title = f"{title_fa} {title_en}"
     if not title.strip():
         return True
+    # Order matters: check longer/more-specific patterns FIRST
+    # 'کارشناس ارشد' must match 'senior' before 'کارشناس' matches 'mid'
     lm = {
         'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی', 'junior', 'intern',
-                    'trainee', 'entry', 'کارآموزی'],
-        'mid': ['کارشناس', 'متخصص', 'میان‌رده', 'mid', 'intermediate',
+                    'trainee', 'entry', 'junior professional'],
+        'mid': ['متخصص', 'میان‌رده', 'mid', 'intermediate',
                 'کارشناس ارشد / متخصص', 'junior professional'],
         'senior': ['ارشد', 'سنیور', 'senior', 'lead', 'expert', 'principal',
-                   'کارشناس ارشد', 'تخصص بالا', 'تخصص بالا'],
+                   'کارشناس ارشد', 'تخصص بالا'],
         'manager': ['مدیر', 'manager', 'director', 'head', 'vp', 'مدیریتی',
                    'سرپرست', 'رئیس', 'معاون'],
     }
     criteria = lm.get(level, [])
     if not criteria:
         return True
+    # For mid level: must match 'متخصص' or 'میان‌رده' (not just 'کارشناس')
+    # to avoid matching 'کارشناس ارشد' which belongs to senior
+    if level == 'mid':
+        # If title contains 'ارشد', it is NOT mid-level
+        if 'ارشد' in title:
+            return False
+        # 'کارشناس' alone (without 'ارشد') is mid
+        if 'کارشناس' in title:
+            return True
+        return any(c in title for c in criteria)
     return any(c in title for c in criteria)
 
 

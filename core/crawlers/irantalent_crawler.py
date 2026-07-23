@@ -59,13 +59,16 @@ CITY_SLUGS = {
 
 # Mapping from our level keys to what IranTalent API actually returns
 SENIORITY_MAP = {
-    'junior': ['junior', 'intern', 'trainee', 'entry level', 'کارآموز', 'جونیور',
-               'کارمند / کارشناس', 'junior professional'],
-    'mid': ['mid-level', 'mid level', 'intermediate', 'متوسط', 'میان‌رده',
-            'کارشناس ارشد / متخصص', 'senior professional'],
+    'junior': ['junior', 'intern', 'trainee', 'entry level', 'کارآموز',
+               'جونیور', 'junior professional'],
+    'mid': ['mid-level', 'mid level', 'intermediate', 'متوسط',
+            'میان‌رده', 'کارمند / کارشناس',
+            'کارشناس', 'senior professional'],
     'senior': ['senior', 'lead', 'expert', 'principal', 'ارشد', 'سنیور',
+               'کارشناس ارشد / متخصص',
                'کارشناس ارشد', 'تخصص بالا'],
-    'manager': ['manager', 'director', 'head', 'vp', 'مدیر', 'سرپرست', 'مدیر میانی'],
+    'manager': ['manager', 'director', 'head', 'vp', 'مدیر', 'سرپرست',
+               'مدیر میانی'],
 }
 
 API_TIMEOUT = 25
@@ -134,14 +137,18 @@ def _job_matches_time(lived_at: str, time_range: str) -> bool:
 
 
 def _job_matches_level(seniority_data, level: str) -> bool:
-    """Check if job's seniority matches the requested level."""
+    """Check if job's seniority matches the requested level.
+
+    Uses EXACT matching first, then substring fallback.
+    This prevents 'Junior Professional' from matching 'junior' filter
+    when the actual Persian title is 'کارمند / کارشناس' (mid-level).
+    """
     if not level or level == 'all':
         return True
     if not seniority_data:
         return True  # Don't filter out if no data
-    level_kws = SENIORITY_MAP.get(level, [])
-    if not level_kws:
-        return True
+
+    # Extract combined text from seniority data
     if isinstance(seniority_data, list):
         texts = []
         for item in seniority_data:
@@ -154,7 +161,36 @@ def _job_matches_level(seniority_data, level: str) -> bool:
         combined = f"{(seniority_data.get('title', '') or '').lower()} {(seniority_data.get('title_farsi', '') or '').lower()}"
     else:
         return True
-    # Check if ANY level keyword matches
+    if not combined.strip():
+        return True
+
+    # EXACT MATCH table (Persian title -> level)
+    # Based on actual IranTalent API values
+    exact_map = {
+        'کارمند / کارشناس': 'mid',
+        'کارشناس ارشد / متخصص': 'senior',
+        'مدیر میانی': 'manager',
+        'کارآموز': 'junior',
+    }
+    for fa_title, fa_level in exact_map.items():
+        if fa_title in combined and fa_level == level:
+            return True
+
+    # For mid: exclude if contains 'ارشد'
+    if level == 'mid' and 'ارشد' in combined:
+        return False
+    # For senior: must contain 'ارشد' or 'senior'
+    if level == 'senior':
+        return ('ارشد' in combined or 'senior' in combined or 'expert' in combined)
+    # For junior: must NOT contain 'ارشد' or 'کارشناس'
+    if level == 'junior':
+        if 'ارشد' in combined or 'کارشناس' in combined:
+            return False
+
+    # Fallback: substring match
+    level_kws = SENIORITY_MAP.get(level, [])
+    if not level_kws:
+        return True
     return any(kw.lower() in combined for kw in level_kws)
 
 

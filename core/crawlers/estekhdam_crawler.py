@@ -158,8 +158,11 @@ def crawl_estekhdam(keywords='', city='', level='all',
 
     logger.info(f"E-estekhdam: q='{body.get('q', '')}', city={city}, filter_kws={len(all_kws)}")
 
-    # Fetch 25 pages = 500 jobs (pagination works!)
-    fetch_pages = 25
+    # Only fetch 10 pages (200 jobs) - most won't match for IT queries
+    fetch_pages = 10
+
+    # Minimum relevance score to include (skip irrelevant jobs)
+    MIN_RELEVANCE = 1.0 if all_kws else 0.0
 
     for page in range(1, fetch_pages + 1):
         try:
@@ -195,7 +198,11 @@ def crawl_estekhdam(keywords='', city='', level='all',
                         continue
 
                 # Relevance scoring
-                relevance = _calc_relevance(job, all_kws) if all_kws else 0.5
+                relevance = _calc_relevance(job, all_kws) if all_kws else 0.0
+
+                # Skip very low relevance jobs when keywords exist
+                if all_kws and relevance < MIN_RELEVANCE:
+                    continue
 
                 company = job.get('brand_name', '') or ''
                 province_name = ', '.join(provinces) if provinces else ''
@@ -269,6 +276,5 @@ def crawl_estekhdam(keywords='', city='', level='all',
     for r in results:
         r.pop('_relevance', None)
 
-    logger.info(f"E-estekhdam total: {len(results)} jobs")
+    logger.info(f"E-estekhdam total: {len(results)} relevant jobs (fetched {len(seen_ids)} total)")
     return results
-

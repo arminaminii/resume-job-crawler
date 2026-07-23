@@ -448,11 +448,13 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str,
 
 # Comprehensive level mapping for sidebar filter.
 # These keywords are searched in BOTH seniority_level AND description fields.
+# IMPORTANT: 'کارشناس' (mid) must NOT match 'کارشناس ارشد' (senior)
+# So for mid, we use EXCLUDE logic in the view.
 LEVEL_EN_TO_FA = {
-    'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی', 'کارمند',
+    'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی',
                 'junior', 'intern', 'trainee', 'entry'],
-    'mid': ['کارشناس ارشد / متخصص', 'میان‌رده', 'متخصص',
-           'mid-level', 'intermediate', 'senior professional'],
+    'mid': ['کارشناس', 'متخصص', 'میان‌رده',
+           'mid-level', 'intermediate', 'junior professional'],
     'senior': ['ارشد', 'سنیور', 'کارشناس ارشد', 'تخصص بالا',
               'senior', 'lead', 'expert', 'principal'],
     'manager': ['مدیر', 'مدیریتی', 'سرپرست', 'رئیس', 'معاون',
@@ -482,17 +484,17 @@ def search_results(request, search_id):
     if city_filter:
         listings = listings.filter(city__icontains=city_filter)
     if level_filter:
-        # Map English level to Persian/English keywords for DB search
-        # Search in BOTH seniority_level AND description for broader matching
+        from django.db.models import Q
         fa_kws = LEVEL_EN_TO_FA.get(level_filter, [])
         if fa_kws:
-            from django.db.models import Q
             q_objects = Q(seniority_level__icontains=fa_kws[0])
             for kw in fa_kws[1:]:
                 q_objects |= Q(seniority_level__icontains=kw)
-            # Also search in description (catches level info embedded there)
             for kw in fa_kws:
                 q_objects |= Q(description__icontains=kw)
+            # For mid: exclude results that contain 'ارشد' (senior)
+            if level_filter == 'mid':
+                q_objects &= ~Q(seniority_level__icontains='ارشد')
             listings = listings.filter(q_objects)
         else:
             listings = listings.filter(
