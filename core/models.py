@@ -1,5 +1,13 @@
 from django.db import models
+from django.core.validators import RegexValidator
 import uuid
+
+
+hex_color_validator = RegexValidator(
+    regex=r'^#[0-9a-fA-F]{6}$',
+    message='فقط کد هگز رنگی معتبر (مثل #6366f1) وارد کنید.',
+    code='invalid_hex_color',
+)
 
 
 class JobCategory(models.Model):
@@ -9,7 +17,8 @@ class JobCategory(models.Model):
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL,
                                related_name='children', verbose_name='دسته والد')
     icon_svg = models.TextField(blank=True, default='', verbose_name='آیکون SVG')
-    color = models.CharField(max_length=7, default='#6366f1', verbose_name='رنگ')
+    color = models.CharField(max_length=7, default='#6366f1', validators=[hex_color_validator],
+                               verbose_name='رنگ')
 
     # Jobvision slug for API filtering
     jobvision_slug = models.CharField(max_length=100, blank=True, default='')
@@ -64,11 +73,17 @@ class JobCategory(models.Model):
             parent = parent.parent
         return ' > '.join(path)
 
-    def get_tree_data(self):
+    def get_tree_data(self, _children_cache=None):
         """Return dict for tree JSON serialization.
-        Uses select_related/prefetch_related to avoid N+1 queries.
+
+        Args:
+            _children_cache: Optional pre-fetched dict {parent_id: [child]}
+                             to avoid N+1 queries. Built by the view layer.
         """
-        children = self.children.filter(is_active=True).order_by('sort_order')
+        if _children_cache is not None:
+            children = _children_cache.get(self.id, [])
+        else:
+            children = list(self.children.filter(is_active=True).order_by('sort_order'))
         data = {
             'id': self.id,
             'name': self.name,
@@ -81,8 +96,8 @@ class JobCategory(models.Model):
             'certifications': self.certifications or [],
             'salary_range': self.salary_range,
             'career_path': self.career_path,
-            'has_children': children.exists(),
-            'children': [child.get_tree_data() for child in children],
+            'has_children': len(children) > 0,
+            'children': [child.get_tree_data(_children_cache) for child in children],
         }
         return data
 

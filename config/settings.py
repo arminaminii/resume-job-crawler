@@ -4,11 +4,27 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY: Use environment variable in production, fallback for dev only
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-)#5)s)msn(zd2gs-5y!$d_cs+6p5rjvj269^amccvnu$c7ot8%')
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-)#5)s)msn(zd2gs-5y!$d_cs+6p5rjvj269^amccvnu$c7ot8%'
+)
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+
+# Security headers (always on)
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Production-only security settings
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL', 'False').lower() == 'true'
+    SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_HSTS_SECONDS', '0'))
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -77,7 +93,6 @@ LOGOUT_REDIRECT_URL = '/'
 
 # Tesseract OCR - Windows path (auto-detects if not found)
 import shutil
-import os
 
 _TESSERACT_PATH = shutil.which('tesseract') or r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 TESSERACT_CMD = _TESSERACT_PATH

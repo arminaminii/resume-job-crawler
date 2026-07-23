@@ -33,7 +33,7 @@
             <div class="jf-tree-root">
                 <div class="jf-tree-node jf-tree-root-node" onclick="toggleNode(this)" data-slug="{{ root.slug }}">
                     <span class="jf-tree-arrow">▶</span>
-                    <span class="jf-tree-icon" style="color:{{ root.color }};">{{ root.icon_svg|safe }}</span>
+                    <span class="jf-tree-icon" style="color:{{ root.color }};">{{ root.icon_svg|sanitize_svg }}</span>
                     <span class="jf-tree-name">{{ root.name }}</span>
                 </div>
                 <div class="jf-tree-children">

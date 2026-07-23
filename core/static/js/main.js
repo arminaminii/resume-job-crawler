@@ -40,7 +40,17 @@ function handleDrop(e) {
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        if (fileInput) fileInput.files = files;
+        // fileInput.files is read-only in modern browsers.
+        // Use DataTransfer API to create a new file list and assign it.
+        try {
+            const dt = new DataTransfer();
+            dt.items.add(files[0]);
+            if (fileInput) fileInput.files = dt.files;
+        } catch (err) {
+            // Fallback: DataTransfer not supported (very old browsers)
+            // The file won't be attached — showFileInfo still runs for UX
+            console.warn('DataTransfer API not supported, drag-drop may not work');
+        }
         showFileInfo(files[0].name);
     }
 }

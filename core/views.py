@@ -97,7 +97,7 @@ def _get_suggested_categories(resume):
     if not resume.extracted_skills and not resume.full_text:
         return []
 
-    categories = JobCategory.objects.filter(is_active=True)
+    categories = JobCategory.objects.filter(is_active=True).select_related('parent')
     scored = []
 
     for cat in categories:
@@ -487,15 +487,26 @@ def search_results(request, search_id):
         from django.db.models import Q
         fa_kws = LEVEL_EN_TO_FA.get(level_filter, [])
         if fa_kws:
-            q_objects = Q(seniority_level__icontains=fa_kws[0])
-            for kw in fa_kws[1:]:
-                q_objects |= Q(seniority_level__icontains=kw)
+            # Match in seniority_level OR description
+            # Use seniority_level as primary, description as secondary
+            q_seniority = Q()
+            q_desc = Q()
             for kw in fa_kws:
-                q_objects |= Q(description__icontains=kw)
-            # For mid: exclude results that contain 'ارشد' (senior)
+                q_seniority |= Q(seniority_level__icontains=kw)
+                q_desc |= Q(description__icontains=kw)
+            
+            # For mid: exclude results where seniority_level contains 'ارشد'
             if level_filter == 'mid':
-                q_objects &= ~Q(seniority_level__icontains='ارشد')
-            listings = listings.filter(q_objects)
+                q_seniority &= ~Q(seniority_level__icontains='ارشد')
+            
+            # If no seniority_level data exists for any listing, fall back to description only
+            # This prevents returning 0 results when crawlers don't provide level data
+            listings_with_level = listings.filter(q_seniority)
+            if listings_with_level.exists():
+                listings = listings_with_level
+            else:
+                # Fallback: match description only (broader, but better than nothing)
+                listings = listings.filter(q_desc)
         else:
             listings = listings.filter(
                 Q(seniority_level__icontains=level_filter) |
@@ -503,12 +514,18 @@ def search_results(request, search_id):
             )
     if keyword_filter:
         from django.db.models import Q
-        listings = listings.filter(
+        kw_q = (
             Q(title__icontains=keyword_filter) |
             Q(company__icontains=keyword_filter) |
-            Q(description__icontains=keyword_filter) |
-            Q(skills__contains=[keyword_filter])
+            Q(description__icontains=keyword_filter)
         )
+        # JSONField __contains with a list works in Django 5.1+ but is case-sensitive
+        # Also try case-insensitive approach via raw JSON text search
+        try:
+            kw_q |= Q(skills__contains=[keyword_filter])
+        except Exception:
+            pass
+        listings = listings.filter(kw_q)
 
     # Pagination (20 per page)
     from django.core.paginator import Paginator
@@ -619,9 +636,16 @@ def job_tree(request):
 @require_GET
 def job_tree_api(request):
     """API: returns full tree as JSON for interactive frontend."""
-    roots = (JobCategory.objects
-             .filter(parent=None, is_active=True)
-             .prefetch_related('children')
-             .order_by('sort_order'))
-    tree = [r.get_tree_data() for r in roots]
+    all_cats = (JobCategory.objects
+                .filter(is_active=True)
+                .select_related('parent')
+                .order_by('sort_order'))
+    # Build children cache: {parent_id: [child1, child2, ...]}
+    children_cache = {}
+    for cat in all_cats:
+        pid = cat.parent_id
+        if pid is not None:
+            children_cache.setdefault(pid, []).append(cat)
+    roots = [c for c in all_cats if c.parent_id is None]
+    tree = [r.get_tree_data(_children_cache=children_cache) for r in roots]
     return JsonResponse({'tree': tree, 'total': len(tree)})

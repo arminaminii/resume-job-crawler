@@ -216,7 +216,11 @@ def crawl_estekhdam(keywords='', city='', level='all',
 
                 contracts = job.get('contract', []) or []
                 job_type = ', '.join(contracts) if contracts else ''
-                salary = job.get('salary', '') or ''
+                salary_raw = job.get('salary', '') or ''
+                if isinstance(salary_raw, dict):
+                    salary = ', '.join(str(v) for v in salary_raw.values() if v)
+                else:
+                    salary = str(salary_raw)
 
                 benefits_raw = job.get('benefits', []) or []
                 benefits = [BENEFIT_LABELS.get(b, b) for b in benefits_raw]
