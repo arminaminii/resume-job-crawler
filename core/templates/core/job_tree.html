@@ -55,9 +55,11 @@
                                     {% for skill in cat.skills|slice:":12" %}
                                     <span class="jf-chip jf-chip-sm">{{ skill }}</span>
                                     {% endfor %}
-                                    {% if cat.skills|length > 12 %}
-                                    <span class="jf-chip jf-chip-sm jf-chip-muted">+{{ cat.skills|length|add:"-12" }}</span>
+                                    {% with count=cat.skills|length %}
+                                    {% if count > 12 %}
+                                    <span class="jf-chip jf-chip-sm jf-chip-muted">+{{ count|add:"-12" }}</span>
                                     {% endif %}
+                                    {% endwith %}
                                 </div>
                             </div>
                             {% endif %}
@@ -109,12 +111,14 @@
                                     <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="vertical-align:middle;margin-left:4px;"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h4a1 1 0 011 1v4a1 1 0 01-1 1h-1a1 1 0 100-2h.5V8H12zM5 12a1 1 0 100-2h1a1 1 0 011 1v3.5h2.5V12a1 1 0 011-1h1a1 1 0 110 2h-4a1 1 0 01-1-1v-4a1 1 0 011-1h1z" clip-rule="evenodd"/></svg>
                                     مسیر پیشرفت
                                 </div>
-                                <div class="jf-tree-path">
+                                {% if cat.career_path and cat.career_path != "" %}
+                        <div class="jf-tree-path">
                                     {% for step in cat.career_path|split_path %}
                                     <span class="jf-tree-path-step">{{ step.strip }}</span>
                                     {% if not forloop.last %}<span class="jf-tree-path-arrow">→</span>{% endif %}
                                     {% endfor %}
                                 </div>
+                        {% endif %}
                             </div>
                             {% endif %}
                         </div>

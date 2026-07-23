@@ -1,21 +1,18 @@
 """
-Jobvision crawler — uses their REST API.
+JobVision crawler — uses their PUBLIC REST API.
 
 API endpoint: POST https://candidateapi.jobvision.ir/api/v1/JobPost/List
 
-CRITICAL RESEARCH FINDINGS (tested 2026-07-22):
-1. 'categorySlugs' in filters is COMPLETELY IGNORED — always returns all jobs
-2. 'keyword' (top-level) WORKS — returns relevant results (e.g. 'python' → 663 results)
-3. 'publishedDateGte' in filters is IGNORED — must use client-side filtering
+RESEARCH FINDINGS (tested 2026-07-23 from crawl-py repo + direct API testing):
+1. 'keyword' at TOP-LEVEL is the ONLY working search param (654 for 'python')
+   'filters.keyword' is IGNORED (43,688 = all jobs). Persian keywords don't work.
+2. 'sort': 0 = newest first (confirmed by crawl-py reference implementation)
+3. 'publishedDateGte' is IGNORED — use client-side 'activationTime.passedDays'
 4. Maximum 30 results per page regardless of pageSize
-5. 'activationTime.passedDays' gives days since posting — perfect for client-side time filter
-6. 'sort' values don't seem to affect results (all return same order)
+5. 'locationSlugs' in filters WORKS for province filtering
+6. 'categorySlugs' is IGNORED
 
-STRATEGY:
-- Send 'keyword' at top-level for server-side text search
-- DO NOT send 'categorySlugs' (API ignores it, wastes bandwidth)
-- Fetch 10+ pages to get comprehensive results (30 per page max)
-- Client-side filter by: time_range (via activationTime.passedDays), level (via seniorityLevel)
+REFERENCE: https://github.com/mahdi-esmaeelnezhad/crawl-py/blob/main/jobvision_crawler.py
 """
 import requests
 import time
@@ -68,7 +65,7 @@ PROVINCE_SLUGS = {
     'قم': 'in-all-cities-of-ghom',
 }
 
-API_TIMEOUT = 25
+API_TIMEOUT = 30
 
 
 def _get_session():
@@ -83,16 +80,22 @@ def _job_matches_level(job: dict, level: str) -> bool:
     if not level or level == 'all':
         return True
     seniority = job.get('seniorityLevel') or {}
+    if not seniority:
+        return True  # If no seniority data, don't filter out
     title_fa = (seniority.get('titleFa', '') or '').lower()
     title_en = (seniority.get('titleEn', '') or '').lower()
     title = f"{title_fa} {title_en}"
     if not title.strip():
         return True
     lm = {
-        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی', 'junior', 'intern', 'trainee', 'entry'],
-        'mid': ['کارشناس', 'متخصص', 'میان‌رده', 'mid', 'intermediate'],
-        'senior': ['ارشد', 'سنیور', 'senior', 'lead', 'expert', 'principal', 'کارشناس ارشد', 'تخصص بالا'],
-        'manager': ['مدیر', 'manager', 'director', 'head', 'vp', 'مدیریتی', 'سرپرست', 'رئیس', 'معاون'],
+        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی', 'junior', 'intern',
+                    'trainee', 'entry', 'کارآموزی'],
+        'mid': ['کارشناس', 'متخصص', 'میان‌رده', 'mid', 'intermediate',
+                'کارشناس ارشد / متخصص', 'junior professional'],
+        'senior': ['ارشد', 'سنیور', 'senior', 'lead', 'expert', 'principal',
+                   'کارشناس ارشد', 'تخصص بالا', 'تخصص بالا'],
+        'manager': ['مدیر', 'manager', 'director', 'head', 'vp', 'مدیریتی',
+                   'سرپرست', 'رئیس', 'معاون'],
     }
     criteria = lm.get(level, [])
     if not criteria:
@@ -101,10 +104,7 @@ def _job_matches_level(job: dict, level: str) -> bool:
 
 
 def _job_matches_time(job: dict, time_range: str) -> bool:
-    """Client-side time filtering using activationTime.passedDays.
-    
-    The API IGNORES publishedDateGte, so we filter here.
-    """
+    """Client-side time filtering using activationTime.passedDays."""
     if not time_range or time_range == 'all':
         return True
     try:
@@ -115,8 +115,18 @@ def _job_matches_time(job: dict, time_range: str) -> bool:
     act = job.get('activationTime') or {}
     passed_days = act.get('passedDays')
     if passed_days is None:
-        return True  # Can't filter without data
+        return True
     return passed_days <= max_days
+
+
+def _text_fa(value):
+    """Extract Farsi text from a JobVision API field (dict or str)."""
+    if value is None:
+        return ''
+    if isinstance(value, dict):
+        return (value.get('titleFa', '') or value.get('title', '') or
+                value.get('titleEn', '') or value.get('beautifyFa', '') or '')
+    return str(value).strip()
 
 
 def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
@@ -126,37 +136,36 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
     """
     Crawl Jobvision via REST API.
     
-    KEY: 'keyword' at top-level is the ONLY working search parameter.
-    categorySlugs is IGNORED by the API.
-    Time filtering is done client-side via activationTime.passedDays.
-    Max 30 results per page — fetch many pages for comprehensive results.
+    Search with keyword at TOP-LEVEL (the only working approach).
+    'filters' is only for locationSlugs.
+    
+    Time filtering: client-side via activationTime.passedDays
+    Max 30 results per page — fetch many pages.
     """
     results = []
     seen_ids = set()
     
-    # Clean keyword (top-level, NOT inside filters)
+    # Clean keyword
     clean_kw = ' '.join(keywords.strip().split()[:5]) if keywords and keywords.strip() else ''
     
-    # Build filters dict — only location works
+    # Build filters dict — location only
     filters = {}
     if city and city in PROVINCE_SLUGS:
         filters['locationSlugs'] = [PROVINCE_SLUGS[city]]
     
     logger.info(f"Jobvision: keyword='{clean_kw[:60]}', city={city}, time_range={time_range}")
     
-    # Fetch many pages — API returns max 30 per page
-    # For 3 "requested" pages, fetch 10 actual pages (300 potential results)
     effective_pages = max(max_pages * 3, 10)
     
     for page in range(1, effective_pages + 1):
         try:
             payload = {
                 "page": page,
-                "pageSize": 40,  # API caps at 30 anyway
-                "sort": 1,
+                "pageSize": 30,
+                "sort": 0,
                 "filters": filters,
             }
-            # keyword goes at TOP-LEVEL (the only working search param)
+            # keyword at TOP-LEVEL
             if clean_kw:
                 payload['keyword'] = clean_kw
             
@@ -175,7 +184,6 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
                 logger.info(f"Jobvision: {total_count} total jobs for keyword='{clean_kw[:30]}'")
             
             if not job_posts:
-                logger.info(f"Jobvision: no more jobs at page {page}")
                 break
             
             page_matches = 0
@@ -185,17 +193,17 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
                     continue
                 seen_ids.add(jid)
                 
-                # --- Client-side time filtering ---
+                # Client-side time filtering
                 if not _job_matches_time(job, time_range):
                     continue
                 
-                # --- Client-side level filtering ---
+                # Client-side level filtering (pass if no data)
                 if not _job_matches_level(job, level):
                     continue
                 
                 page_matches += 1
                 
-                # --- Extract all data ---
+                # Extract all data
                 title = job.get('title', '')
                 
                 company_info = job.get('company', {}) or {}
@@ -205,58 +213,37 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
                 loc = job.get('location', {}) or {}
                 city_obj = loc.get('city', {}) or {}
                 prov_obj = loc.get('province', {}) or {}
-                city_name = (city_obj.get('titleFa', '') or
-                            city_obj.get('name', '') or
-                            prov_obj.get('titleFa', ''))
-                province_name = prov_obj.get('titleFa', '') or prov_obj.get('name', '')
+                city_name = _text_fa(city_obj) or _text_fa(prov_obj)
+                province_name = _text_fa(prov_obj)
                 
                 sal = job.get('salary', {}) or {}
-                salary = sal.get('titleFa', '')
-                if not salary:
-                    mn = sal.get('min', '')
-                    mx = sal.get('max', '')
-                    if mn or mx:
-                        salary = f"{mn or ''} - {mx or ''} میلیون تومان"
+                salary = _text_fa(sal)
                 
-                wt = job.get('workType', {}) or {}
-                work_type = wt.get('titleFa', '') or wt.get('titleEn', '')
+                work_type = _text_fa(job.get('workType'))
+                seniority = _text_fa(job.get('seniorityLevel'))
                 
-                sr = job.get('seniorityLevel', {}) or {}
-                seniority = sr.get('titleFa', '') or sr.get('titleEn', '')
+                # Skills (from skills array)
+                skills = [_text_fa(s) for s in (job.get('skills') or []) if _text_fa(s)]
                 
-                skills = []
-                for s in (job.get('skills') or []):
-                    if isinstance(s, dict):
-                        skills.append(s.get('titleFa', '') or s.get('titleEn', ''))
-                    elif isinstance(s, str):
-                        skills.append(s)
+                # Job categories
+                cats = [_text_fa(c) for c in (job.get('jobCategories') or []) if _text_fa(c)]
                 
-                cats = []
-                for c in (job.get('jobCategories') or []):
-                    n = c.get('titleFa', '') or c.get('titleEn', '')
-                    if n:
-                        cats.append(n)
+                # Benefits
+                benefits = [_text_fa(b) for b in (job.get('benefits') or []) if _text_fa(b)]
                 
                 props = job.get('properties', {}) or {}
                 is_remote = props.get('isRemote', False)
                 
                 act = job.get('activationTime', {}) or {}
-                posted_date = act.get('beautifyFa', '') or ''
-                
-                benefits = []
-                for b in (job.get('benefits', []) or []):
-                    if isinstance(b, dict):
-                        benefits.append(b.get('titleFa', '') or b.get('titleEn', ''))
-                    elif isinstance(b, str):
-                        benefits.append(b)
+                posted_date = _text_fa(act) or act.get('beautifyFa', '')
                 
                 url = f"https://jobvision.ir/jobs/{jid}"
                 
                 desc_parts = []
                 if cats:
-                    desc_parts.append(f"دسته: {', '.join(cats[:3])}")
+                    desc_parts.append('دسته: ' + ', '.join(cats[:3]))
                 if benefits:
-                    desc_parts.append(f"مزایا: {', '.join(benefits[:5])}")
+                    desc_parts.append('مزایا: ' + ', '.join(benefits[:5]))
                 description = ' | '.join(desc_parts)
                 
                 all_skills = skills + benefits
@@ -281,8 +268,7 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
                         f"{page_matches} matched (total: {len(results)})")
             time.sleep(0.3)
             
-            # Stop if we have enough results
-            if len(results) >= max_pages * 40:
+            if len(results) >= max_pages * 50:
                 break
             
         except requests.Timeout:

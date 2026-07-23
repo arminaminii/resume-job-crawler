@@ -1,22 +1,25 @@
 """
-E-estekhdam crawler — handles BROKEN API gracefully.
+E-estekhdam crawler.
 
 API endpoint: POST https://www.e-estekhdam.com/search-api/search?page=N
 
-CRITICAL RESEARCH FINDINGS (tested 2026-07-22):
-1. The API COMPLETELY IGNORES the 'q' parameter — always returns same 20 promoted jobs
-2. NO 'created_at' or 'updated_at' field exists in the response
-3. No alternative API endpoints exist (all 404)
-4. The only available data: id, title, brand_name, brand_sector, contract,
-   position_levels, provinces, technologies, benefits, promoted flag
+RESEARCH FINDINGS (tested 2026-07-23):
+1. API COMPLETELY IGNORES all search params (q, keyword, search, title, page_size)
+2. Pagination WORKS - each page returns 20 DIFFERENT jobs (200 unique across 10 pages)
+3. No date fields exist (no created_at, updated_at, etc.)
+4. Available fields: id, uuid, title, short_title, brand_name, brand_sector,
+   gender, contract, position_levels, provinces, technologies, benefits,
+   url, is_new, salary, location
+5. 'promoted' field is null (not True/False)
+6. No alternative API endpoints (all 404)
+7. Website is SPA - no SSR HTML to scrape
 
 STRATEGY:
-- Accept that this API only returns promoted jobs
-- Use HEAVY client-side filtering for relevance
-- Score results by how many category keywords match in title/sector/technologies
-- Sort by relevance (most relevant promoted jobs first)
-- If no jobs pass the relevance filter, return empty list
-- Fetch many pages to get more promoted jobs to filter from
+- Fetch 25 pages (500 jobs) and do HEAVY client-side filtering
+- Title match = highest weight, technologies = high, sector = medium
+- Province filtering in client-side
+- No time filtering possible
+- If few/no relevant results found, return top matches anyway (better than nothing)
 """
 import requests
 import logging
@@ -36,6 +39,7 @@ _HEADERS = {
     "Referer": f"{BASE_URL}/search/",
 }
 
+# Province names in E-estekhdam format
 PROVINCE_MAP = {
     'تهران': 'تهران', 'اصفهان': 'اصفهان', 'البرز': 'البرز',
     'خراسان رضوی': 'خراسان رضوی', 'فارس': 'فارس', 'خوزستان': 'خوزستان',
@@ -72,16 +76,12 @@ def _get_session():
 
 
 def _calc_relevance(job_data: dict, filter_kws: list) -> float:
-    """
-    Calculate relevance score. Title match = 5, sector = 3, technologies = 2, etc.
-    Returns 0.0 if no keywords match at all.
-    """
+    """Calculate relevance score based on keyword matches in various fields."""
     if not filter_kws:
         return 0.5
 
     title = (job_data.get('title', '') or '').lower()
     short_title = (job_data.get('short_title', '') or '').lower()
-    company = (job_data.get('brand_name', '') or '').lower()
     sector = (job_data.get('brand_sector', '') or '').lower()
     techs = [t.lower() for t in (job_data.get('technologies', []) or [])]
     levels = [p.lower() for p in (job_data.get('position_levels', []) or [])]
@@ -91,18 +91,24 @@ def _calc_relevance(job_data: dict, filter_kws: list) -> float:
     score = 0.0
     for kw in filter_kws:
         kw_l = kw.lower()
+        # Title match (highest weight)
         if kw_l in title:
             score += 5
         if kw_l in short_title:
-            score += 5
-        if kw_l in sector:
-            score += 3
+            score += 4
+        # Technologies match (high weight - these are actual skills)
         if any(kw_l in t for t in techs):
+            score += 3
+        # Sector/industry match
+        if kw_l in sector:
             score += 2
+        # Level match
         if any(kw_l in l for l in levels):
             score += 2
+        # Contract match
         if any(kw_l in c for c in contracts):
             score += 1
+        # Benefits match (lowest)
         if any(kw_l in b for b in benefits):
             score += 0.5
 
@@ -110,19 +116,23 @@ def _calc_relevance(job_data: dict, filter_kws: list) -> float:
 
 
 def _job_matches_level(contracts, position_levels, level):
+    """Check level match. Pass if no data available."""
     if not level or level == 'all':
         return True
+    # E-estekhdam has limited level data - many jobs have null position_levels
+    all_text = ' '.join(contracts + position_levels)
+    if not all_text.strip():
+        return True  # Don't filter out jobs without level data
     lm = {
-        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'مقدماتی', 'trainee', 'intern'],
-        'mid': ['متوسط', 'میان‌رده', 'کارشناس', 'متخصص'],
+        'junior': ['کارآموز', 'جونیور', 'مبتدی', 'مقدماتی', 'trainee', 'intern', 'junior'],
+        'mid': ['متوسط', 'میان‌رده', 'کارشناس', 'متخصص', 'mid'],
         'senior': ['ارشد', 'سنیور', 'Senior', 'کارشناس ارشد', 'senior'],
         'manager': ['مدیر', 'Manager', 'سرپرست', 'مدیریتی', 'manager'],
     }
     kws = lm.get(level, [])
     if not kws:
         return True
-    full = ' '.join(contracts + position_levels)
-    return any(kw in full for kw in kws)
+    return any(kw in all_text for kw in kws)
 
 
 def crawl_estekhdam(keywords='', city='', level='all',
@@ -130,11 +140,10 @@ def crawl_estekhdam(keywords='', city='', level='all',
                       category_slugs=None,
                       client_filter_keywords=None):
     """
-    Crawl e-estekhdam.com via its BROKEN API.
+    Crawl e-estekhdam.com via its API.
     
-    The API ignores all search params and returns promoted jobs only.
-    We filter heavily client-side and sort by relevance.
-    No time filtering is possible (no date field in response).
+    The API ignores search params - returns ALL jobs in pages of 20.
+    We fetch many pages and do HEAVY client-side filtering.
     """
     results = []
     seen_ids = set()
@@ -142,19 +151,17 @@ def crawl_estekhdam(keywords='', city='', level='all',
     user_kws = [k.strip().lower() for k in (keywords or '').split() if k.strip()] if keywords else []
     all_kws = list(set(cfk + user_kws))
 
+    # E-estekhdam API ignores body params, but we send anyway for consistency
     body = {}
     if keywords and keywords.strip():
         body['q'] = ' '.join(keywords.strip().split()[:3])
-    if city and city in PROVINCE_MAP:
-        body['where'] = PROVINCE_MAP[city]
 
-    logger.info(f"E-estekhdam: q='{body.get('q','')}', city={city}, filter_kws={len(all_kws)}")
-    logger.warning("E-estekhdam API is BROKEN - only returns promoted jobs. Using client-side filtering.")
+    logger.info(f"E-estekhdam: q='{body.get('q', '')}', city={city}, filter_kws={len(all_kws)}")
 
-    # Fetch many pages to get more promoted jobs to filter
-    effective_pages = max(max_pages * 3, 10)
+    # Fetch 25 pages = 500 jobs (pagination works!)
+    fetch_pages = 25
 
-    for page in range(1, effective_pages + 1):
+    for page in range(1, fetch_pages + 1):
         try:
             _s = _get_session()
             resp = _s.post(f"{SEARCH_API}?page={page}", json=body, timeout=API_TIMEOUT)
@@ -178,19 +185,27 @@ def crawl_estekhdam(keywords='', city='', level='all',
                 if not title:
                     continue
 
-                # Skip if NO keywords match at all
-                if all_kws:
-                    relevance = _calc_relevance(job, all_kws)
-                    if relevance < 1.0:  # At least one meaningful match required
-                        continue
-                else:
-                    relevance = 0.5
-
-                company = job.get('brand_name', '')
+                # Province filtering (client-side since API ignores it)
                 provinces = job.get('provinces', []) or []
+                if city and city in PROVINCE_MAP:
+                    target_province = PROVINCE_MAP[city]
+                    if target_province not in provinces and not any(
+                        target_province in p for p in provinces
+                    ):
+                        continue
+
+                # Relevance scoring
+                relevance = _calc_relevance(job, all_kws) if all_kws else 0.5
+
+                company = job.get('brand_name', '') or ''
                 province_name = ', '.join(provinces) if provinces else ''
                 location = job.get('location', '') or ''
-                city_name = location.split('،')[-1].strip() if location else (province_name or '')
+                # Extract city from location (last part after comma)
+                if location:
+                    parts = location.replace('،', ',').split(',')
+                    city_name = parts[-1].strip()
+                else:
+                    city_name = province_name
 
                 contracts = job.get('contract', []) or []
                 job_type = ', '.join(contracts) if contracts else ''
@@ -200,7 +215,8 @@ def crawl_estekhdam(keywords='', city='', level='all',
                 benefits = [BENEFIT_LABELS.get(b, b) for b in benefits_raw]
                 technologies = job.get('technologies', []) or []
 
-                is_remote = any(kw in job_type for kw in ['دورکاری', 'Remote']) or 'remote_work' in benefits_raw
+                is_remote = (any(kw in job_type for kw in ['دورکاری', 'Remote']) or
+                            'remote_work' in benefits_raw)
 
                 url_path = job.get('url', '')
                 url = f"{BASE_URL}{url_path}" if url_path else ''
@@ -209,7 +225,7 @@ def crawl_estekhdam(keywords='', city='', level='all',
                 seniority = ', '.join(position_levels) if position_levels else ''
                 brand_sector = job.get('brand_sector', '')
 
-                # Level filtering
+                # Level filtering (pass if no data)
                 if not _job_matches_level(contracts, position_levels, level):
                     continue
 
@@ -239,9 +255,7 @@ def crawl_estekhdam(keywords='', city='', level='all',
                     '_relevance': relevance,
                 })
 
-            time.sleep(0.3)
-            if len(results) >= max_pages * 30:
-                break
+            time.sleep(0.25)
         except requests.Timeout:
             break
         except requests.ConnectionError:
@@ -250,10 +264,11 @@ def crawl_estekhdam(keywords='', city='', level='all',
             logger.error(f"E-estekhdam error at page {page}: {e}")
             break
 
-    # Sort by relevance
+    # Sort by relevance (best matches first)
     results.sort(key=lambda x: x.get('_relevance', 0), reverse=True)
     for r in results:
         r.pop('_relevance', None)
 
-    logger.info(f"E-estekhdam total: {len(results)} jobs (from promoted only)")
+    logger.info(f"E-estekhdam total: {len(results)} jobs")
     return results
+

@@ -15,7 +15,7 @@ from .services.bert_classifier import classify_resume, suggest_search_keywords
 logger = logging.getLogger(__name__)
 
 # Max seconds each crawler is allowed to run before we kill it
-CRAWLER_TIMEOUT_SECONDS = 60
+CRAWLER_TIMEOUT_SECONDS = 90
 
 
 def home(request):
@@ -379,11 +379,17 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     return status_messages
 
 
+# Comprehensive level mapping for sidebar filter.
+# These keywords are searched in BOTH seniority_level AND description fields.
 LEVEL_EN_TO_FA = {
-    'junior': ['کارآموز', 'جونیور', 'مبتدی'],
-    'mid': ['کارشناس', 'متخصص', 'میان‌رده'],
-    'senior': ['ارشد', 'سنیور', 'کارشناس ارشد'],
-    'manager': ['مدیر', 'مدیریتی', 'سرپرست', 'رئیس'],
+    'junior': ['کارآموز', 'جونیور', 'مبتدی', 'کارآموزی', 'کارمند',
+                'junior', 'intern', 'trainee', 'entry'],
+    'mid': ['کارشناس ارشد / متخصص', 'میان‌رده', 'متخصص',
+           'mid-level', 'intermediate', 'senior professional'],
+    'senior': ['ارشد', 'سنیور', 'کارشناس ارشد', 'تخصص بالا',
+              'senior', 'lead', 'expert', 'principal'],
+    'manager': ['مدیر', 'مدیریتی', 'سرپرست', 'رئیس', 'معاون',
+              'manager', 'director', 'head'],
 }
 
 PLATFORM_NAMES = {
@@ -409,16 +415,23 @@ def search_results(request, search_id):
     if city_filter:
         listings = listings.filter(city__icontains=city_filter)
     if level_filter:
-        # Map English level to Persian keywords for DB search
+        # Map English level to Persian/English keywords for DB search
+        # Search in BOTH seniority_level AND description for broader matching
         fa_kws = LEVEL_EN_TO_FA.get(level_filter, [])
         if fa_kws:
             from django.db.models import Q
-            q_objects = Q(**{'seniority_level__icontains': fa_kws[0]})
+            q_objects = Q(seniority_level__icontains=fa_kws[0])
             for kw in fa_kws[1:]:
-                q_objects |= Q(**{'seniority_level__icontains': kw})
+                q_objects |= Q(seniority_level__icontains=kw)
+            # Also search in description (catches level info embedded there)
+            for kw in fa_kws:
+                q_objects |= Q(description__icontains=kw)
             listings = listings.filter(q_objects)
         else:
-            listings = listings.filter(seniority_level__icontains=level_filter)
+            listings = listings.filter(
+                Q(seniority_level__icontains=level_filter) |
+                Q(description__icontains=level_filter)
+            )
     if keyword_filter:
         from django.db.models import Q
         listings = listings.filter(
