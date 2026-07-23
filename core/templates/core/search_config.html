@@ -373,12 +373,27 @@ distSelect.addEventListener('change', function() {
 
     if (dir && dist && tehranDistricts[dir] && tehranDistricts[dir].districts[dist]) {
         neighborhoodGroup.style.display = 'block';
-        nhSelect.innerHTML = '<option value="">همه محله‌ها</option>';
-        tehranDistricts[dir].districts[dist].neighborhoods.forEach(nh => {
-            const opt = document.createElement('option');
-            opt.value = nh; opt.textContent = nh;
-            nhSelect.appendChild(opt);
-        });
+        nhSelect.innerHTML = '<option value="">همه محله‌ها و خیابان‌ها</option>';
+        const distData = tehranDistricts[dir].districts[dist];
+        if (distData.neighborhoods) {
+            distData.neighborhoods.forEach(nh => {
+                const opt = document.createElement('option');
+                opt.value = nh; opt.textContent = nh;
+                nhSelect.appendChild(opt);
+            });
+        }
+        if (distData.main_streets) {
+            // Add separator
+            const sep = document.createElement('option');
+            sep.disabled = true;
+            sep.textContent = '── خیابان‌های اصلی ──';
+            nhSelect.appendChild(sep);
+            distData.main_streets.forEach(st => {
+                const opt = document.createElement('option');
+                opt.value = st; opt.textContent = st;
+                nhSelect.appendChild(opt);
+            });
+        }
     } else {
         neighborhoodGroup.style.display = 'none';
     }
