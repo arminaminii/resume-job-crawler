@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import Resume
+from .data.provinces_cities import get_province_choices
 
 
 ALLOWED_EXTENSIONS = ('.pdf', '.png', '.jpg', '.jpeg', '.docx', '.txt', '.bmp', '.tiff')
@@ -55,35 +56,50 @@ class SearchConfigForm(forms.Form):
         initial=['jobvision'],
     )
 
+    # --- Cascading Province -> City ---
+    province = forms.ChoiceField(
+        label='استان',
+        widget=forms.Select(
+            attrs={'class': 'form-select modern-select', 'id': 'provinceSelect'}
+        ),
+        choices=get_province_choices(),
+        required=False,
+    )
+
     city = forms.ChoiceField(
         label='شهر',
-        widget=forms.Select(attrs={'class': 'form-select modern-select'}),
-        choices=[
-            ('', 'همه شهرها'),
-            ('تهران', 'تهران'),
-            ('اصفهان', 'اصفهان'),
-            ('البرز', 'البرز (کرج)'),
-            ('خراسان رضوی', 'خراسان رضوی (مشهد)'),
-            ('فارس', 'فارس (شیراز)'),
-            ('خوزستان', 'خوزستان (اهواز)'),
-            ('گیلان', 'گیلان (رشت)'),
-            ('مازندران', 'مازندران (ساری)'),
-            ('آذربایجان شرقی', 'آذربایجان شرقی (تبریز)'),
-            ('آذربایجان غربی', 'آذربایجان غربی (ارومیه)'),
-            ('کرمان', 'کرمان'),
-            ('هرمزگان', 'هرمزگان (بندرعباس)'),
-            ('یزد', 'یزد'),
-            ('مرکزی', 'مرکزی (اراک)'),
-            ('گلستان', 'گلستان (گرگان)'),
-            ('سمنان', 'سمنان'),
-            ('کرمانشاه', 'کرمانشاه'),
-            ('همدان', 'همدان'),
-            ('لرستان', 'لرستان (خرم‌آباد)'),
-            ('بوشهر', 'بوشهر'),
-            ('زنجان', 'زنجان'),
-            ('اردبیل', 'اردبیل'),
-            ('سایر', 'سایر شهرها'),
-        ],
+        widget=forms.Select(
+            attrs={'class': 'form-select modern-select', 'id': 'citySelect'}
+        ),
+        choices=[('', 'ابتدا استان را انتخاب کنید')],
+        required=False,
+    )
+
+    # --- Tehran District Selection (hidden unless Tehran is selected) ---
+    tehran_direction = forms.ChoiceField(
+        label='جهت در تهران',
+        widget=forms.Select(
+            attrs={'class': 'form-select modern-select', 'id': 'tehranDirectionSelect'}
+        ),
+        choices=[('', 'تمام تهران')],
+        required=False,
+    )
+
+    tehran_district = forms.ChoiceField(
+        label='منطقه',
+        widget=forms.Select(
+            attrs={'class': 'form-select modern-select', 'id': 'tehranDistrictSelect'}
+        ),
+        choices=[('', 'ابتدا جهت را انتخاب کنید')],
+        required=False,
+    )
+
+    tehran_neighborhood = forms.ChoiceField(
+        label='محله',
+        widget=forms.Select(
+            attrs={'class': 'form-select modern-select', 'id': 'tehranNeighborhoodSelect'}
+        ),
+        choices=[('', 'ابتدا منطقه را انتخاب کنید')],
         required=False,
     )
 

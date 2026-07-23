@@ -1,4 +1,5 @@
 import logging
+import json
 import traceback
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,6 +12,12 @@ from .models import Resume, JobSearch, JobListing, JobCategory
 from .forms import ResumeUploadForm, SearchConfigForm
 from .services.ocr_service import extract_resume_text
 from .services.bert_classifier import classify_resume, suggest_search_keywords
+from .data.provinces_cities import (
+    PROVINCES, TEHRAN_DISTRICTS,
+    get_city_choices, get_tehran_direction_choices,
+    get_tehran_district_choices, get_tehran_neighborhood_choices,
+    resolve_location,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,13 +167,26 @@ def search_config(request, resume_id):
             })
 
         if form.is_valid():
-            # Build client-side filter keywords from selected categories
+            # Resolve location from cascading fields
+            province = form.cleaned_data.get('province', '')
+            city = form.cleaned_data.get('city', '')
+            tehran_dir = form.cleaned_data.get('tehran_direction', '')
+            tehran_dist = form.cleaned_data.get('tehran_district', '')
+            tehran_nh = form.cleaned_data.get('tehran_neighborhood', '')
+
+            loc = resolve_location(
+                province=province, city=city,
+                tehran_direction=tehran_dir,
+                tehran_district=tehran_dist,
+                tehran_neighborhood=tehran_nh,
+            )
+
             custom_kw = form.cleaned_data.get('custom_keywords', '')
 
             search = JobSearch.objects.create(
                 resume=resume,
                 platforms=form.cleaned_data['platforms'],
-                city=form.cleaned_data['city'],
+                city=loc['display_text'] or '',
                 level=form.cleaned_data['level'],
                 time_range=form.cleaned_data['time_range'],
                 custom_keywords=custom_kw,
@@ -177,7 +197,13 @@ def search_config(request, resume_id):
             # Run crawling (with per-crawler timeout protection)
             try:
                 client_filter_kw = _build_client_filter_keywords(selected_cats)
-                crawler_messages = _run_search(search, client_filter_kw, suggested_keywords)
+                crawler_messages = _run_search(
+                    search, client_filter_kw, suggested_keywords,
+                    province=loc['province'],
+                    city=loc['city'],
+                    jobvision_slug=loc['jobvision_slug'],
+                    irantalent_slug=loc['irantalent_slug'],
+                )
                 search.status = 'completed'
 
                 for msg in crawler_messages:
@@ -219,7 +245,36 @@ def search_config(request, resume_id):
         'preselected_slugs': preselected_slugs,
         'selected_platforms': selected_platforms,
         'selected_cats_post': selected_cats_post,
+        'province_cities_json': json.dumps(PROVINCES, ensure_ascii=False),
+        'tehran_districts_json': json.dumps(TEHRAN_DISTRICTS, ensure_ascii=False),
     })
+
+
+@require_GET
+def cities_api(request):
+    """API endpoint: returns city list for a given province."""
+    province = request.GET.get('province', '')
+    choices = get_city_choices(province)
+    data = [{'value': v, 'label': l} for v, l in choices]
+    return JsonResponse({'cities': data})
+
+
+@require_GET
+def tehran_districts_api(request):
+    """API endpoint: returns Tehran districts for a given direction."""
+    direction = request.GET.get('direction', '')
+    choices = get_tehran_district_choices(direction)
+    data = [{'value': v, 'label': l} for v, l in choices]
+    return JsonResponse({'districts': data})
+
+
+@require_GET
+def tehran_neighborhoods_api(request):
+    """API endpoint: returns neighborhoods for a given district."""
+    district = request.GET.get('district', '')
+    choices = get_tehran_neighborhood_choices(district)
+    data = [{'value': v, 'label': l} for v, l in choices]
+    return JsonResponse({'neighborhoods': data})
 
 
 def _build_client_filter_keywords(selected_slugs: list) -> list:
@@ -269,7 +324,9 @@ def _run_crawler_safe(crawler_func, crawler_name, **kwargs) -> tuple:
         return [], f'{crawler_name}: خطا - {str(e)[:80]}'
 
 
-def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str) -> list:
+def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str,
+               province: str = '', city: str = '',
+               jobvision_slug: str = None, irantalent_slug: str = None) -> list:
     """
     Execute the job search across all selected platforms.
 
@@ -278,6 +335,12 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     1. Category's per-platform slugs (jobvision_slug, irantalent_slug, etc.)
     2. Skill aliases mapped to each platform's terminology
     3. User's custom keywords as top priority
+
+    Location handling:
+    - province: province name (e.g. 'تهران') — used for all crawlers
+    - city: specific city name for client-side filtering
+    - jobvision_slug: JV API locationSlugs (province-level)
+    - irantalent_slug: IT API location_slugs (province-level)
 
     Fallback chain for keywords:
     - User custom keywords → SkillMapper aliases → Category keywords_en → Category skills
@@ -307,10 +370,12 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     if 'jobvision' in search.platforms:
         from .crawlers.jobvision_crawler import crawl_jobvision
         jv_query = mapper.get_query('jobvision')
+        # Use province name for JobVision (it has PROVINCE_SLUGS mapping internally)
+        jv_city = province or search.city
         results, msg = _run_crawler_safe(
             crawl_jobvision, 'جاب‌ویژن',
             keywords=jv_query['keywords'],
-            city=search.city,
+            city=jv_city,
             level=search.level,
             time_range=search.time_range,
             max_pages=3,
@@ -324,10 +389,11 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     if 'e_estekhdam' in search.platforms:
         from .crawlers.estekhdam_crawler import crawl_estekhdam
         ee_query = mapper.get_query('e_estekhdam')
+        ee_city = province or search.city
         results, msg = _run_crawler_safe(
             crawl_estekhdam, 'ای‌استخدام',
             keywords=ee_query['keywords'],
-            city=search.city,
+            city=ee_city,
             level=search.level,
             time_range=search.time_range,
             max_pages=3,
@@ -341,10 +407,11 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str)
     if 'irantalent' in search.platforms:
         from .crawlers.irantalent_crawler import crawl_irantalent
         it_query = mapper.get_query('irantalent')
+        it_city = province or search.city
         results, msg = _run_crawler_safe(
             crawl_irantalent, 'ایران‌تلنت',
             keywords=it_query['keywords'],
-            city=search.city,
+            city=it_city,
             level=search.level,
             time_range=search.time_range,
             max_pages=3,

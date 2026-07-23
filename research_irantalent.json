@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/topics/job-scraper?o=desc&s=stars",
+    "name": "job-scraper · GitHub Topics",
+    "snippet": "An AI-powered suite to automate job scraping, resume parsing, job-to-resume. A Python-based web scraping toolkit for extracting and organizing job Missing: irantalent | Show results with: irantalent",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-scraping-tool",
+    "name": "job-scraping-tool · GitHub Topics",
+    "snippet": "The Job Crawler is an integral component of the Job RAID project, designed to automatically scrape and collect data from various job listing websites. Missing: irantalent | Show results with: irantalent",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/sreekar2858/JobSearch-Agent",
+    "name": "JobSearch-Agent automates job searching by scraping  - GitHub",
+    "snippet": "JobSearch-Agent automates job searching by scraping listings, filtering based on user preferences, and managing applications. Easily customize search criteria, ... Missing: irantalent crawler",
+    "host_name": "github.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-board-scraper",
+    "name": "job-board-scraper · GitHub Topics",
+    "snippet": "Our Reed Jobs Scraper extracts real-time job postings at scale from all over the world. A new research tool built for recruitment, insights and HR. Missing: irantalent | Show results with: irantalent",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/SideProject/comments/1rarsdj/built_a_site_which_scrapes_latest_developer_jobs",
+    "name": "Built a site which scrapes latest developer jobs in one single platform",
+    "snippet": "Mainly it Automatically scrapes new jobs everyday at 6 am and 6 pm (IST) , It is a NextJS frontend app with a helper python backend job scraper ... Missing: irantalent crawler",
+    "host_name": "www.reddit.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/scraping-python?l=python",
+    "name": "scraping-python · GitHub Topics",
+    "snippet": "Python program designed to scrape posts from Telegram channels using HTTP requests and HTML parsing, rather than Telegrams API. Scrapes job listings from ... Missing: irantalent | Show results with: irantalent",
+    "host_name": "github.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-listings-scraper?l=python&o=asc&s=stars",
+    "name": "job-listings-scraper · GitHub Topics",
+    "snippet": "Hub is where people build software. An unofficial, async-first Python client for the Wuzzuf Jobs API python. Add a description, image, and links to the job- ... Missing: irantalent | Show results with: irantalent",
+    "host_name": "github.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/data-science/automate-your-job-search-with-python-and-github-actions-1dc818844c0",
+    "name": "Automate your job search with Python and Github Actions - Medium",
+    "snippet": "Automate your job search with Python and Github Actions A real-life example using Scrapy … an API for extracting information from HTML pages. ... Missing: irantalent | Show results with: irantalent",
+    "host_name": "medium.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/arihant1798/job-scraper",
+    "name": "arihant1798/job-scraper: A web scraper of job listings - GitHub",
+    "snippet": "A web scraper that should extract job data from a job posting website. The aim is to help the user with the 'job hunting' and employment process. Roughly, the ... Missing: irantalent api",
+    "host_name": "github.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/tiwn60/recruitment-data-scraper",
+    "name": "Recruitment Data Scraping API: How to Collect Job Postings  - GitHub",
+    "snippet": "This guide is about how to approach recruitment data scraping properly — what data you actually need, which job sites are hardest to scrape, how a recruitment ... Missing: irantalent | Show results with: irantalent",
+    "host_name": "github.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

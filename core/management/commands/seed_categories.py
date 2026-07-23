@@ -1,6 +1,11 @@
 """
-Comprehensive job categories seed data for the Persian job market.
-Covers all major categories from Jobvision, E-estekhdam, IranTalent.
+Comprehensive job categories seed data with DUAL PARALLEL TREES:
+  1. Education-based tree (تحصیلی): University majors → Specializations → Job titles → Skills
+  2. Skills-based tree (مهارتی): Tech areas → Specializations → Titles → Skills
+
+Each leaf node has platform slugs (jobvision, irantalent, estekhdam),
+skills, positions, keywords, education requirements, and career paths.
+
 Run: python manage.py seed_categories
 """
 from django.core.management.base import BaseCommand
@@ -23,350 +28,518 @@ ICONS = {
     'content': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
     'sales': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
     'medical': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
-    'legal': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><path d="M12 22V12"/><path d="M22 7L12 12 2 7"/></svg>',
     'engineering': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
-    'logistics': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
-    'construction': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><path d="M9 20v-6h6v6"/></svg>',
-    'customer-service': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>',
-    'game': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6.01" y2="10"/><line x1="10" y1="10" x2="10.01" y2="10"/><line x1="14" y1="14" x2="14.01" y2="14"/><line x1="18" y1="14" x2="18.01" y2="14"/></svg>',
-    'science': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v7l5 7H4l5-7V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg>',
-    'translation': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>',
-    'agriculture': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c4-4 8-7.5 8-12a8 8 0 10-16 0c0 4.5 4 8 8 12z"/><path d="M12 10a2 2 0 100-4 2 2 0 000 4z"/></svg>',
-    'other': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
+    'qa': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',
+    'game': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.544-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg>',
 }
 
-CATEGORIES = [
-    # ===== Parent Categories (Tree Roots) =====
-    {'name': 'فناوری اطلاعات و نرم‌افزار', 'slug': 'it-parent', 'icon': 'developer', 'color': '#6366f1', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['فناوری', 'نرم‌افزار', 'IT', 'کامپیوتر'], 'kw_en': ['IT', 'software', 'technology', 'computer']},
-    {'name': 'طراحی و خلاقیت', 'slug': 'design-parent', 'icon': 'design', 'color': '#ec4899', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['طراحی', 'خلاقیت', 'هنر'], 'kw_en': ['design', 'creative', 'art']},
-    {'name': 'بازاریابی و فروش', 'slug': 'marketing-parent', 'icon': 'marketing', 'color': '#14b8a6', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['بازاریابی', 'فروش', 'بازار'], 'kw_en': ['marketing', 'sales', 'business']},
-    {'name': 'مالی و حسابداری', 'slug': 'finance-parent', 'icon': 'finance', 'color': '#84cc16', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['مالی', 'حسابداری', 'بانک'], 'kw_en': ['finance', 'accounting', 'banking']},
-    {'name': 'منابع انسانی و مدیریت', 'slug': 'hr-mgmt-parent', 'icon': 'management', 'color': '#a855f7', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['منابع انسانی', 'مدیریت', 'اداری'], 'kw_en': ['HR', 'management', 'administration']},
-    {'name': 'مهندسی', 'slug': 'engineering-parent', 'icon': 'engineering', 'color': '#ca8a04', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['مهندسی', 'تولید', 'صنععت'], 'kw_en': ['engineering', 'manufacturing', 'industry']},
-    {'name': 'پزشکی و سلامت', 'slug': 'medical-parent', 'icon': 'medical', 'color': '#22c55e', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['پزشکی', 'بهداشت', 'درمان'], 'kw_en': ['medical', 'health', 'healthcare']},
-    {'name': 'آموزش و پژوهش', 'slug': 'education-parent', 'icon': 'content', 'color': '#0d9488', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['آموزش', 'تدریس', 'پژوهش'], 'kw_en': ['education', 'teaching', 'research']},
-    {'name': 'خدمات و سایر', 'slug': 'services-parent', 'icon': 'customer-service', 'color': '#64748b', 'sort': 0,
-     'skills': [], 'positions': [], 'kw_fa': ['خدمات', 'اداری', 'پشتیبانی'], 'kw_en': ['services', 'support', 'operations']},
 
-    # ===== فناوری اطلاعات و نرم‌افزار =====
-    {'name': 'برنامه‌نویسی و توسعه نرم‌افزار', 'slug': 'developer', 'parent': 'it-parent', 'icon': 'developer', 'color': '#6366f1', 'jv': 'developer', 'es': 'برنامه-نویسی', 'itl': 'developer', 'sort': 1,
-     'skills': ['Python','JavaScript','TypeScript','Java','C#','C++','PHP','Ruby','Go','Rust','Swift','Kotlin','Dart','Django','Flask','FastAPI','Spring','Laravel','ASP.NET','Node.js','Git','Docker','Linux','SQL','REST API','GraphQL','Microservices','Agile','Scrum','OOP'],
-     'positions': ['برنامه‌نویس','توسعه‌دهنده','Developer','Software Engineer','Backend Developer','Frontend Developer','Full Stack Developer','Tech Lead','Software Architect'],
-     'kw_fa': ['برنامه‌نویسی','توسعه نرم‌افزار','نرم‌افزار','کدنویسی','وب‌سایت'], 'kw_en': ['programming','software development','coding','web development']},
-    {'name': 'توسعه وب فرانت\u200cاند', 'slug': 'frontend', 'parent': 'it-parent', 'icon': 'frontend', 'color': '#8b5cf6', 'jv': 'developer', 'itl': 'frontend-developer', 'sort': 2,
-     'skills': ['HTML','CSS','JavaScript','TypeScript','React','Vue.js','Angular','Next.js','Nuxt.js','Tailwind CSS','Bootstrap','SASS','Webpack','Vite','jQuery','Redux','Responsive Design','SEO'],
-     'positions': ['Frontend Developer','Web Developer','UI Developer','React Developer','Vue Developer','Angular Developer'],
-     'kw_fa': ['فرانت‌اند','وب','رابط کاربری','سایت'], 'kw_en': ['frontend','web','ui','html','css']},
-    {'name': 'توسعه وب بک‌اند', 'slug': 'backend', 'parent': 'it-parent', 'icon': 'developer', 'color': '#3b82f6', 'jv': 'developer', 'itl': 'backend-developer', 'sort': 3,
-     'skills': ['Python','Django','Flask','FastAPI','Java','Spring Boot','Node.js','Express.js','C#','ASP.NET','PHP','Laravel','Go','SQL','PostgreSQL','MySQL','MongoDB','Redis','REST API','GraphQL','Docker','Kubernetes','Linux','Nginx','Celery'],
-     'positions': ['Backend Developer','Server Developer','API Developer','Python Developer','Java Developer','Node.js Developer'],
-     'kw_fa': ['بک‌اند','سرور','API','دیتابیس'], 'kw_en': ['backend','server','api','database']},
-    {'name': 'توسعه موبایل', 'slug': 'mobile', 'parent': 'it-parent', 'icon': 'mobile', 'color': '#06b6d4', 'jv': 'mobile-developer', 'es': 'موبایل', 'itl': 'mobile-developer', 'sort': 4,
-     'skills': ['Flutter','Dart','React Native','Swift','Kotlin','iOS','Android','Java','Firebase','SQLite','REST API'],
-     'positions': ['Mobile Developer','Android Developer','iOS Developer','Flutter Developer','React Native Developer'],
-     'kw_fa': ['موبایل','اندروید','iOS','اپلیکیشن'], 'kw_en': ['mobile','android','ios','app','flutter']},
-    {'name': 'علم داده و تحلیل داده', 'slug': 'data-science', 'parent': 'it-parent', 'icon': 'data', 'color': '#10b981', 'jv': 'data-science', 'es': 'داده', 'itl': 'data-science', 'sort': 5,
-     'skills': ['Python','Pandas','NumPy','Scikit-learn','Matplotlib','Seaborn','SQL','PostgreSQL','Excel','Power BI','Tableau','R','SPSS','Apache Spark','Hadoop','ETL','Statistics','A/B Testing','Jupyter'],
-     'positions': ['Data Analyst','Data Scientist','Business Analyst','BI Developer','Data Engineer'],
-     'kw_fa': ['داده','تحلیل داده','علم داده','بیگ دیتا','آمار'], 'kw_en': ['data','analytics','data science','big data','statistics']},
-    {'name': 'هوش مصنوعی و یادگیری ماشین', 'slug': 'ai-ml', 'parent': 'it-parent', 'icon': 'ai', 'color': '#f43f5e', 'jv': 'data-science', 'itl': 'data-science', 'sort': 6,
-     'skills': ['Python','TensorFlow','PyTorch','Scikit-learn','Keras','NLP','Computer Vision','Deep Learning','Machine Learning','OpenCV','Pandas','NumPy','Transformers','BERT','GPT','LangChain'],
-     'positions': ['ML Engineer','AI Engineer','NLP Engineer','Computer Vision Engineer','Deep Learning Engineer','AI Researcher'],
-     'kw_fa': ['هوش مصنوعی','یادگیری ماشین','یادگیری عمیق','NLP','بینایی ماشین'], 'kw_en': ['artificial intelligence','machine learning','deep learning','nlp','ai']},
-    {'name': 'DevOps و زیرساخت', 'slug': 'devops', 'parent': 'it-parent', 'icon': 'devops', 'color': '#f59e0b', 'jv': 'devops', 'es': 'دواپس', 'itl': 'devops', 'sort': 7,
-     'skills': ['Docker','Kubernetes','CI/CD','Jenkins','GitLab CI','GitHub Actions','AWS','Azure','GCP','Terraform','Ansible','Linux','Nginx','Prometheus','Grafana','ELK Stack'],
-     'positions': ['DevOps Engineer','Site Reliability Engineer','Cloud Engineer','System Administrator','Infrastructure Engineer'],
-     'kw_fa': ['دواپس','زیرساخت','سرور','ابر','CI/CD'], 'kw_en': ['devops','infrastructure','cloud','server','sre']},
-    {'name': 'شبکه و سیستم‌ها', 'slug': 'network', 'parent': 'it-parent', 'icon': 'network', 'color': '#64748b', 'jv': 'it', 'itl': 'it', 'sort': 8,
-     'skills': ['Networking','TCP/IP','DNS','VPN','Firewall','Cisco','MikroTik','Windows Server','Linux Server','Active Directory','VMware','LAN','WAN'],
-     'positions': ['Network Engineer','System Administrator','IT Manager','Help Desk'],
-     'kw_fa': ['شبکه','سیستم','IT','پشتیبانی'], 'kw_en': ['network','system','it','support','admin']},
-    {'name': 'امنیت سایبری', 'slug': 'security', 'parent': 'it-parent', 'icon': 'security', 'color': '#ef4444', 'jv': 'security', 'es': 'امنیت', 'itl': 'it', 'sort': 9,
-     'skills': ['Penetration Testing','Network Security','Web Security','OWASP','Burp Suite','Nmap','Wireshark','Metasploit','Firewall','SIEM','SOC','Python','Linux','Cryptography'],
-     'positions': ['Security Engineer','Penetration Tester','Security Analyst','SOC Analyst','Bug Hunter'],
-     'kw_fa': ['امنیت','سایبری','نفوذ','هکر','فایروال'], 'kw_en': ['security','cybersecurity','penetration','hacking','vulnerability']},
-    {'name': 'تست و کنترل کیفیت نرم‌افزار', 'slug': 'qa-testing', 'parent': 'it-parent', 'icon': 'developer', 'color': '#0891b2', 'jv': 'developer', 'es': 'تست-نرم-افزار', 'itl': 'qa-tester', 'sort': 10,
-     'skills': ['Selenium','Cypress','Playwright','Jest','PyTest','JUnit','Postman','JMeter','API Testing','Manual Testing','Test Planning','Bug Tracking','SQL'],
-     'positions': ['QA Engineer','Test Engineer','SDET','Automation Engineer','Manual Tester','QA Lead'],
-     'kw_fa': ['تست','کنترل کیفیت','QA','بگ','باگ'], 'kw_en': ['testing','qa','quality assurance','selenium','automation']},
-    {'name': 'توسعه بازی و گیم', 'slug': 'game-dev', 'parent': 'it-parent', 'icon': 'game', 'color': '#7c3aed', 'jv': 'developer', 'itl': 'developer', 'sort': 11,
-     'skills': ['Unity','Unreal Engine','C#','C++','Blender','3D Modeling','Game Design','Physics Engine','OpenGL','DirectX','Photon','Multiplayer'],
-     'positions': ['Game Developer','Game Designer','3D Artist','Game Programmer','Unity Developer','Level Designer'],
-     'kw_fa': ['بازی','گیم','گیمینگ','بازی‌سازی'], 'kw_en': ['game','gaming','unity','unreal','game development']},
-    {'name': 'پایگاه داده و DBA', 'slug': 'database', 'parent': 'it-parent', 'icon': 'data', 'color': '#0d9488', 'jv': 'developer', 'itl': 'database-admin', 'sort': 12,
-     'skills': ['SQL','PostgreSQL','MySQL','MongoDB','Redis','Oracle','SQL Server','Elasticsearch','Data Modeling','Replication','Backup','Performance Tuning','PL/SQL'],
-     'positions': ['Database Administrator','DBA','Data Engineer','Database Developer','PostgreSQL DBA'],
-     'kw_fa': ['دیتابیس','پایگاه داده','DBA','SQL'], 'kw_en': ['database','dba','sql','postgresql','mongodb']},
+def _c(slug, name, parent_slug=None, icon='developer', color='#6366f1',
+       sort_order=0, skills=None, positions=None, keywords_fa=None,
+       keywords_en=None, education=None, certifications=None,
+       salary_range='', career_path='',
+       jobvision_slug='', estekhdam_slug='', irantalent_slug=''):
+    """Helper to create a category dict for seeding."""
+    return {
+        'slug': slug, 'name': name, 'parent_slug': parent_slug,
+        'icon_svg': ICONS.get(icon, ICONS['developer']),
+        'color': color, 'sort_order': sort_order,
+        'skills': skills or [], 'positions': positions or [],
+        'keywords_fa': keywords_fa or [], 'keywords_en': keywords_en or [],
+        'education': education or [], 'certifications': certifications or [],
+        'salary_range': salary_range, 'career_path': career_path,
+        'jobvision_slug': jobvision_slug, 'estekhdam_slug': estekhdam_slug,
+        'irantalent_slug': irantalent_slug,
+    }
 
-    # ===== طراحی و خلاقیت =====
-    {'name': 'طراحی گرافیک و UI/UX', 'slug': 'ui-ux', 'parent': 'design-parent', 'icon': 'design', 'color': '#ec4899', 'jv': 'ui-ux', 'es': 'طراحی', 'itl': 'design', 'sort': 13,
-     'skills': ['Figma','Adobe XD','Photoshop','Illustrator','After Effects','InDesign','UI Design','UX Design','User Research','Wireframing','Prototyping','Design System','Typography'],
-     'positions': ['UI Designer','UX Designer','Graphic Designer','Product Designer','Visual Designer','Motion Designer','Art Director'],
-     'kw_fa': ['طراحی','گرافیک','رابط کاربری','تجربه کاربری'], 'kw_en': ['design','graphic','ui','ux','figma','photoshop']},
-    {'name': 'طراحی وب و قالب', 'slug': 'web-design', 'parent': 'design-parent', 'icon': 'frontend', 'color': '#a855f7', 'jv': 'developer', 'es': 'طراحی-وب', 'itl': 'design', 'sort': 14,
-     'skills': ['HTML','CSS','JavaScript','Photoshop','Figma','Adobe XD','Responsive Design','WordPress','Webflow','UI Design'],
-     'positions': ['Web Designer','UI Designer','Frontend Developer','WordPress Developer'],
-     'kw_fa': ['طراحی وب','قالب','وردپرس','وب‌سایت'], 'kw_en': ['web design','wordpress','template','landing page']},
-    {'name': 'انیمیشن و موشن‌گرافیک', 'slug': 'animation', 'parent': 'design-parent', 'icon': 'design', 'color': '#d946ef', 'jv': 'design', 'es': 'انیمیشن', 'itl': 'design', 'sort': 15,
-     'skills': ['After Effects','Premiere Pro','Cinema 4D','Blender','Maya','3D Animation','Motion Graphics','Character Animation','Storyboard'],
-     'positions': ['Motion Designer','Animator','3D Artist','Video Editor','Animation Director'],
-     'kw_fa': ['انیمیشن','موشن','ویدیو','تولید محتوای ویدیویی'], 'kw_en': ['animation','motion graphics','after effects','video']},
-    {'name': 'عکاسی و تدوین ویدیو', 'slug': 'photography', 'parent': 'design-parent', 'icon': 'design', 'color': '#f472b6', 'jv': 'design', 'es': 'عکاسی', 'itl': 'design', 'sort': 16,
-     'skills': ['Photography','Photoshop','Lightroom','Premiere Pro','DaVinci Resolve','Final Cut Pro','After Effects','Color Grading','Lighting'],
-     'positions': ['Photographer','Videographer','Video Editor','Colorist','Cameraman','Photo Editor'],
-     'kw_fa': ['عکاسی','ویدیو','تدوین','فیلمبرداری'], 'kw_en': ['photography','video editing','videography','film']},
 
-    # ===== بازاریابی و فروش =====
-    {'name': 'بازاریابی دیجیتال و سئو', 'slug': 'digital-marketing', 'parent': 'marketing-parent', 'icon': 'marketing', 'color': '#14b8a6', 'jv': 'digital-marketing', 'es': 'بازاریابی', 'itl': 'marketing', 'sort': 17,
-     'skills': ['SEO','Google Analytics','Google Ads','Facebook Ads','Content Marketing','Email Marketing','Social Media Marketing','Copywriting','WordPress','Shopify','Google Tag Manager','Marketing Automation','Growth Hacking'],
-     'positions': ['Digital Marketer','SEO Specialist','Content Marketer','Social Media Manager','Growth Hacker','Marketing Manager'],
-     'kw_fa': ['بازاریابی','سئو','SEO','محتوا','شبکه‌های اجتماعی','تبلیغات'], 'kw_en': ['marketing','seo','digital marketing','content','social media','advertising']},
-    {'name': 'فروش و توسعه کسب‌وکار', 'slug': 'sales', 'parent': 'marketing-parent', 'icon': 'sales', 'color': '#f97316', 'jv': 'business-development', 'es': 'فروش', 'itl': 'sales', 'sort': 18,
-     'skills': ['B2B Sales','Negotiation','CRM','Salesforce','Business Development','Lead Generation','Market Research','Excel','Presentation'],
-     'positions': ['Sales Manager','Business Developer','Account Manager','Sales Representative','Customer Success Manager'],
-     'kw_fa': ['فروش','بازاریابی','کسب‌وکار','نمایندگی'], 'kw_en': ['sales','business development','b2b','account','revenue']},
-    {'name': 'روابط عمومی و برندینگ', 'slug': 'pr-branding', 'parent': 'marketing-parent', 'icon': 'marketing', 'color': '#fb923c', 'jv': 'digital-marketing', 'es': 'روابط-عمومی', 'itl': 'marketing', 'sort': 19,
-     'skills': ['Public Relations','Brand Management','Media Relations','Event Planning','Crisis Communication','Social Media','Content Strategy','Copywriting'],
-     'positions': ['PR Manager','Brand Manager','Communications Specialist','Event Manager','Media Relations Manager'],
-     'kw_fa': ['روابط عمومی','برند','نام تجاری','ارتباطات'], 'kw_en': ['public relations','branding','communications','pr']},
-    {'name': 'تولید محتوا و کپی‌رایتینگ', 'slug': 'content', 'parent': 'marketing-parent', 'icon': 'content', 'color': '#d946ef', 'jv': 'content', 'es': 'محتوا', 'itl': 'content-writer', 'sort': 20,
-     'skills': ['Copywriting','Content Writing','SEO Writing','Storytelling','WordPress','Canva','Social Media Content','Translation'],
-     'positions': ['Content Writer','Copywriter','Content Manager','Blogger','Technical Writer'],
-     'kw_fa': ['محتوا','نویسندگی','کپی‌رایتینگ','وبلاگ'], 'kw_en': ['content','writing','copywriting','blog']},
+# ──────────────────────────────────────────────────
+# TREE 1: Education-Based (درخت تحصیلی)
+# University Major → Specialization → Job Title → Skills
+# ──────────────────────────────────────────────────
+EDUCATION_TREE = [
+    # Level 1: Engineering (مهندسی)
+    _c('eng', 'مهندسی', icon='engineering', color='#3b82f6', sort_order=10,
+       keywords_fa=['مهندسی', 'مهندس'], keywords_en=['engineering', 'engineer'],
+       education=['کارشناسی مهندسی', 'کارشناسی ارشد', 'دکتری'],
+       career_path='مهندس جونیور → مهندس متخصص → مهندس ارشد → مدیر فنی → مدیر ارشد مهندسی'),
 
-    # ===== مالی و حسابداری =====
-    {'name': 'مالی و حسابداری', 'slug': 'accounting', 'icon': 'finance', 'color': '#84cc16', 'jv': 'accounting', 'es': 'حسابداری', 'itl': 'finance', 'sort': 21,
-     'skills': ['Excel','Accounting','Financial Analysis','Audit','SAP','ERP','Tax','Financial Reporting','Budgeting','Power BI','SQL'],
-     'positions': ['Accountant','Financial Analyst','Auditor','Finance Manager','CFO','Tax Consultant'],
-     'kw_fa': ['حسابداری','مالی','حسابرسی','بودجه','مالیات'], 'kw_en': ['accounting','finance','audit','tax','financial']},
-    {'name': 'بازرگانی و امور مالی', 'slug': 'trade-finance', 'icon': 'finance', 'color': '#65a30d', 'jv': 'accounting', 'es': 'بازرگانی', 'itl': 'finance', 'sort': 22,
-     'skills': ['Import/Export','Customs','Trade Finance','LC','Insurance','International Trade','Supply Chain','Contract Management'],
-     'positions': ['Trade Specialist','Import/Export Manager','Commercial Manager','Customs Broker','Trade Finance Analyst'],
-     'kw_fa': ['بازرگانی','صادرات','واردات','گمرک','تجارت'], 'kw_en': ['trade','import','export','commerce','business']},
-    {'name': 'بیمه و بانکداری', 'slug': 'insurance-banking', 'icon': 'finance', 'color': '#16a34a', 'jv': 'accounting', 'es': 'بیمه', 'itl': 'finance', 'sort': 23,
-     'skills': ['Insurance','Banking','Risk Management','Compliance','Financial Analysis','Credit Analysis','Loan Processing','Customer Service'],
-     'positions': ['Insurance Agent','Banker','Risk Analyst','Loan Officer','Branch Manager','Compliance Officer'],
-     'kw_fa': ['بیمه','بانک','مالی','ریسک','وام'], 'kw_en': ['insurance','banking','finance','risk','loan']},
+    # Level 2: Computer Engineering
+    _c('eng-computer', 'مهندسی کامپیوتر', parent_slug='eng', icon='developer', color='#6366f1', sort_order=1,
+       keywords_fa=['مهندسی کامپیوتر', 'مهندسی نرم‌افزار', 'مهندسی سخت‌افزار'],
+       keywords_en=['computer engineering', 'software engineering', 'computer science'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی ارشد نرم‌افزار'],
+       career_path='برنامه‌نویس جونیور → برنامه‌نویس ارشد → معماری نرم‌افزار → CTO'),
 
-    # ===== منابع انسانی و مدیریت =====
-    {'name': 'منابع انسانی', 'slug': 'hr', 'icon': 'hr', 'color': '#a855f7', 'jv': 'human-resources', 'es': 'منابع-انسانی', 'itl': 'human-resources', 'sort': 24,
-     'skills': ['Recruitment','Talent Acquisition','Performance Management','Labor Law','HRIS','Payroll','Training','Interviewing'],
-     'positions': ['HR Manager','Recruiter','Talent Acquisition Specialist','HR Specialist','Training Manager'],
-     'kw_fa': ['منابع انسانی','استخدام','پرسنلی'], 'kw_en': ['hr','human resources','recruitment','talent','hiring']},
-    {'name': 'مدیریت و رهبری', 'slug': 'management', 'icon': 'management', 'color': '#0ea5e9', 'jv': 'business-development', 'es': 'مدیریت', 'itl': 'manager', 'sort': 25,
-     'skills': ['Project Management','Agile','Scrum','Kanban','Jira','Leadership','Strategic Planning','Team Management','Risk Management','PMP'],
-     'positions': ['Project Manager','Product Manager','Scrum Master','Operations Manager','General Manager'],
-     'kw_fa': ['مدیریت','رهبری','پروژه','مدیر','استراتژی'], 'kw_en': ['management','leadership','project','scrum','agile']},
-    {'name': 'خدمات مشتری و پشتیبانی', 'slug': 'customer-service', 'icon': 'customer-service', 'color': '#06b6d4', 'jv': 'customer-service', 'es': 'پشتیبانی', 'itl': 'customer-service', 'sort': 26,
-     'skills': ['Customer Service','CRM','Communication','Problem Solving','Ticketing Systems','Zendesk','Live Chat','Phone Support','Salesforce'],
-     'positions': ['Customer Service Representative','Support Agent','Call Center Agent','Customer Success Manager','Help Desk'],
-     'kw_fa': ['پشتیبانی','خدمات مشتری','تماس','استقبال'], 'kw_en': ['customer service','support','help desk','call center']},
+    # Level 3: Software Engineering
+    _c('eng-sw', 'مهندسی نرم‌افزار', parent_slug='eng-computer', icon='developer', color='#8b5cf6', sort_order=1,
+       skills=['Python', 'Java', 'C#', 'JavaScript', 'TypeScript', 'Go', 'Rust',
+               'SQL', 'Git', 'Linux', 'Docker', 'REST API', 'Microservices',
+               'Object-Oriented', 'Design Patterns', 'Unit Testing', 'CI/CD'],
+       positions=['برنامه‌نویس بک‌اند', 'توسعه‌دهنده نرم‌افزار', 'مهندس نرم‌افزار',
+                  'Backend Developer', 'Software Engineer'],
+       keywords_fa=['نرم‌افزار', 'برنامه‌نویسی', 'توسعه', 'بک‌اند', 'backend'],
+       keywords_en=['software', 'programming', 'backend', 'development', 'coder'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی ارشد نرم‌افزار', 'دکتری مهندسی نرم‌افزار'],
+       salary_range='۱۵ - ۵۰ میلیون تومان (جونیور تا سنیور)',
+       career_path='Junior Dev → Mid Dev → Senior Dev → Tech Lead → Software Architect → CTO',
+       jobvision_slug='software', estekhdam_slug='software', irantalent_slug='software-engineering'),
 
-    # ===== مهندسی =====
-    {'name': 'مهندسی صنایع', 'slug': 'industrial', 'icon': 'engineering', 'color': '#78716c', 'jv': 'engineering', 'es': 'صنایع', 'itl': 'engineering', 'sort': 27,
-     'skills': ['Optimization','Supply Chain','Lean','Six Sigma','AutoCAD','MATLAB','Quality Control','ERP','SAP'],
-     'positions': ['Industrial Engineer','Production Manager','Quality Engineer','Supply Chain Analyst'],
-     'kw_fa': ['صنایع','تولید','کنترل کیفیت'], 'kw_en': ['industrial','production','quality','supply chain']},
-    {'name': 'مهندسی برق و الکترونیک', 'slug': 'electrical', 'icon': 'engineering', 'color': '#eab308', 'jv': 'engineering', 'es': 'برق', 'itl': 'engineering', 'sort': 28,
-     'skills': ['PLC','SCADA','AutoCAD','MATLAB','Circuit Design','Arduino','Raspberry Pi','Power Systems','Control Systems','Embedded Systems'],
-     'positions': ['Electrical Engineer','Electronics Engineer','Control Engineer','Automation Engineer','Embedded Engineer'],
-     'kw_fa': ['برق','الکترونیک','اتوماسیون','PLC'], 'kw_en': ['electrical','electronics','automation','plc','embedded']},
-    {'name': 'مهندسی مکانیک', 'slug': 'mechanical', 'icon': 'engineering', 'color': '#a16207', 'jv': 'engineering', 'es': 'مکانیک', 'itl': 'engineering', 'sort': 29,
-     'skills': ['AutoCAD','SolidWorks','CATIA','ANSYS','MATLAB','Thermodynamics','Fluid Mechanics','Manufacturing','CNC','3D Modeling'],
-     'positions': ['Mechanical Engineer','Design Engineer','Manufacturing Engineer','Maintenance Engineer','CAD Designer'],
-     'kw_fa': ['مکانیک','طراحی صنعتی','تولید','CNC'], 'kw_en': ['mechanical','design','manufacturing','cad','engineering']},
-    {'name': 'مهندسی عمران و معماری', 'slug': 'civil-architecture', 'icon': 'construction', 'color': '#ca8a04', 'jv': 'engineering', 'es': 'عمران', 'itl': 'engineering', 'sort': 30,
-     'skills': ['AutoCAD','Revit','SketchUp','3ds Max','ETABS','STAAD','Project Management','Construction','Structural Design','BIM'],
-     'positions': ['Civil Engineer','Architect','Structural Engineer','Site Engineer','Project Manager','BIM Specialist'],
-     'kw_fa': ['عمران','معماری','ساختمان','پروژه ساختمانی'], 'kw_en': ['civil','architecture','construction','structural','bim']},
-    {'name': 'مهندسی شیمی و نفت', 'slug': 'chemical-petroleum', 'icon': 'science', 'color': '#dc2626', 'jv': 'engineering', 'es': 'شیمی', 'itl': 'engineering', 'sort': 31,
-     'skills': ['Chemical Engineering','Process Design','HYSYS','MATLAB','Lab Equipment','Quality Control','Safety','Environmental'],
-     'positions': ['Chemical Engineer','Process Engineer','Petroleum Engineer','Lab Technician','HSE Engineer'],
-     'kw_fa': ['شیمی','نفت','پتروشیمی','پالایشگاه'], 'kw_en': ['chemical','petroleum','process','engineering','oil']},
-    {'name': 'مهندسی کامپیوتر و سخت‌افزار', 'slug': 'hardware', 'icon': 'engineering', 'color': '#2563eb', 'jv': 'it', 'es': 'سخت-افزار', 'itl': 'it', 'sort': 32,
-     'skills': ['VHDL','Verilog','FPGA','PCB Design','Altium','C','Assembly','Embedded C','Microcontroller','ARM','IoT','Raspberry Pi','Arduino'],
-     'positions': ['Hardware Engineer','Embedded Engineer','FPGA Engineer','PCB Designer','IoT Engineer','Firmware Developer'],
-     'kw_fa': ['سخت‌افزار','تعبیه‌شده','IoT','مدار'], 'kw_en': ['hardware','embedded','fpga','pcb','iot','firmware']},
+    # Level 4: Python Backend
+    _c('eng-sw-python', 'توسعه‌دهنده پایتون', parent_slug='eng-sw', icon='developer', color='#22c55e', sort_order=1,
+       skills=['Python', 'Django', 'Flask', 'FastAPI', 'Celery', 'PostgreSQL',
+               'Redis', 'Docker', 'REST API', 'SQLAlchemy', 'Pytest',
+               'Pandas', 'Scrapy', 'gRPC'],
+       positions=['برنامه‌نویس پایتون', 'توسعه‌دهنده بک‌اند پایتون',
+                  'Python Developer', 'Django Developer', 'Backend Engineer'],
+       keywords_fa=['پایتون', 'جنگو', 'فلسک', 'دجانگو'],
+       keywords_en=['python', 'django', 'flask', 'fastapi'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی IT'],
+       salary_range='۲۰ - ۶۰ میلیون تومان',
+       career_path='Python Dev → Senior Python → Django Expert → Backend Architect',
+       jobvision_slug='python', irantalent_slug='python'),
 
-    # ===== پزشکی و سلامت =====
-    {'name': 'پزشکی و سلامت', 'slug': 'medical', 'icon': 'medical', 'color': '#22c55e', 'jv': 'healthcare', 'es': 'پزشکی', 'sort': 33,
-     'skills': ['Medical Knowledge','Patient Care','Electronic Health Records','Pharmacology','Diagnosis','Treatment Planning','Clinical Research'],
-     'positions': ['Doctor','General Practitioner','Specialist','Medical Assistant','Lab Technician','Researcher'],
-     'kw_fa': ['پزشکی','بهداشت','درمان','دارو'], 'kw_en': ['medical','health','healthcare','pharmacy','clinical']},
-    {'name': 'پرستاری و مامایی', 'slug': 'nursing', 'icon': 'medical', 'color': '#16a34a', 'jv': 'healthcare', 'es': 'پرستاری', 'itl': 'medical', 'sort': 34,
-     'skills': ['Patient Care','Nursing','First Aid','Medical Records','Vital Signs','Medication Administration','Communication'],
-     'positions': ['Nurse','Head Nurse','ICU Nurse','Midwife','Nursing Assistant'],
-     'kw_fa': ['پرستاری','مامایی','بیمارستان','مراقبت'], 'kw_en': ['nursing','healthcare','patient care','medical']},
-    {'name': 'داروسازی و علوم آزمایشگاهی', 'slug': 'pharmacy-lab', 'icon': 'science', 'color': '#059669', 'jv': 'healthcare', 'es': 'داروسازی', 'sort': 35,
-     'skills': ['Pharmacology','Pharmaceutical','Lab Equipment','Quality Control','Clinical Trials','Regulatory Affairs','GMP'],
-     'positions': ['Pharmacist','Lab Technician','Quality Control Analyst','Clinical Research Associate','Regulatory Affairs Specialist'],
-     'kw_fa': ['داروسازی','آزمایشگاه','دارو','تحقیقات بالینی'], 'kw_en': ['pharmacy','laboratory','pharmaceutical','clinical research']},
+    # Level 4: Java Backend
+    _c('eng-sw-java', 'توسعه‌دهنده جاوا', parent_slug='eng-sw', icon='developer', color='#ef4444', sort_order=2,
+       skills=['Java', 'Spring Boot', 'Spring Cloud', 'Maven', 'Gradle',
+               'Hibernate', 'PostgreSQL', 'Microservices', 'Kafka',
+               'Redis', 'Docker', 'Kubernetes', 'Jenkins'],
+       positions=['برنامه‌نویس جاوا', 'توسعه‌دهنده Spring',
+                  'Java Developer', 'Backend Engineer Java'],
+       keywords_fa=['جاوا', 'اسپرینگ', 'جاوا اسپرینگ'],
+       keywords_en=['java', 'spring', 'spring boot'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی IT'],
+       salary_range='۲۰ - ۷۰ میلیون تومان',
+       career_path='Java Dev → Senior Java → Spring Architect → Tech Lead',
+       jobvision_slug='java', irantalent_slug='java'),
 
-    # ===== آموزش و پژوهش =====
-    {'name': 'آموزش و تدریس', 'slug': 'education', 'icon': 'content', 'color': '#0d9488', 'jv': 'education', 'es': 'آموزش', 'sort': 36,
-     'skills': ['Teaching','Curriculum Development','E-Learning','PowerPoint','Educational Technology','Classroom Management','Lesson Planning'],
-     'positions': ['Teacher','Professor','Instructor','Trainer','Tutor','Education Consultant'],
-     'kw_fa': ['آموزش','تدریس','معلمی','مدرس'], 'kw_en': ['education','teaching','teacher','instructor']},
-    {'name': 'تحقیق و پژوهش', 'slug': 'research', 'icon': 'science', 'color': '#7c3aed', 'jv': 'education', 'es': 'پژوهش', 'sort': 37,
-     'skills': ['Research','Data Analysis','Academic Writing','SPSS','MATLAB','Statistics','Publication','Literature Review','Grant Writing'],
-     'positions': ['Researcher','Research Assistant','Professor','Scientist','Analyst'],
-     'kw_fa': ['پژوهش','تحقیق','دانشگاه','علمی'], 'kw_en': ['research','academic','science','analysis','university']},
+    # Level 4: .NET Backend
+    _c('eng-sw-dotnet', 'توسعه‌دهنده دات‌نت', parent_slug='eng-sw', icon='developer', color='#7c3aed', sort_order=3,
+       skills=['C#', '.NET Core', 'ASP.NET', 'Entity Framework', 'SQL Server',
+               'Azure', 'Blazor', 'WPF', 'LINQ', 'Docker'],
+       positions=['برنامه‌نویس سی‌شارپ', 'توسعه‌دهنده دات‌نت', '.NET Developer'],
+       keywords_fa=['سی شارپ', 'دات نت', 'سی‌شارپ'],
+       keywords_en=['c#', '.net', 'dotnet'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی IT'],
+       salary_range='۱۸ - ۵۵ میلیون تومان'),
 
-    # ===== حقوق و قضایی =====
-    {'name': 'حقوق و قضایی', 'slug': 'legal', 'icon': 'legal', 'color': '#b45309', 'jv': 'legal', 'es': 'حقوق', 'itl': 'legal', 'sort': 38,
-     'skills': ['Law','Legal Research','Contract Law','Labor Law','Commercial Law','Legal Writing','Negotiation','Litigation','Arbitration'],
-     'positions': ['Lawyer','Legal Consultant','Legal Assistant','Judge','Notary','Compliance Officer'],
-     'kw_fa': ['حقوق','وکیل','قضایی','قرارداد','دعاوی'], 'kw_en': ['law','legal','lawyer','attorney','compliance']},
+    # Level 4: Node.js
+    _c('eng-sw-nodejs', 'توسعه‌دهنده نود جی‌اس', parent_slug='eng-sw', icon='developer', color='#22c55e', sort_order=4,
+       skills=['Node.js', 'Express', 'NestJS', 'TypeScript', 'MongoDB',
+               'PostgreSQL', 'Redis', 'Socket.IO', 'Docker', 'GraphQL'],
+       positions=['برنامه‌نویس نود', 'Node Developer', 'Full Stack Developer'],
+       keywords_fa=['نود جی‌اس', 'نود', 'Node.js'],
+       keywords_en=['nodejs', 'node.js', 'express'],
+       salary_range='۱۸ - ۵۵ میلیون تومان'),
 
-    # ===== لجستیک و حمل‌ونقل =====
-    {'name': 'لجستیک و حمل‌ونقل', 'slug': 'logistics', 'icon': 'logistics', 'color': '#0284c7', 'jv': 'logistics', 'es': 'لجستیک', 'itl': 'logistics', 'sort': 39,
-     'skills': ['Supply Chain','Warehouse Management','Inventory','Shipping','Import/Export','ERP','SAP','Logistics','Fleet Management'],
-     'positions': ['Logistics Manager','Warehouse Manager','Supply Chain Manager','Fleet Manager','Import/Export Specialist'],
-     'kw_fa': ['لجستیک','انبار','حمل‌ونقل','توزیع'], 'kw_en': ['logistics','supply chain','warehouse','transportation','shipping']},
+    # Level 4: PHP/Laravel
+    _c('eng-sw-php', 'توسعه‌دهنده پی‌اچ‌پی', parent_slug='eng-sw', icon='developer', color='#6366f1', sort_order=5,
+       skills=['PHP', 'Laravel', 'WordPress', 'MySQL', 'Redis', 'Docker',
+               'Composer', 'PHPUnit', 'REST API', 'Vue.js'],
+       positions=['برنامه‌نویس پی‌اچ‌پی', 'Laravel Developer'],
+       keywords_fa=['پی‌اچ‌پی', 'لاراول', 'وردپرس'],
+       keywords_en=['php', 'laravel', 'wordpress'],
+       salary_range='۱۵ - ۴۵ میلیون تومان'),
 
-    # ===== کشاورزی و دامپروری =====
-    {'name': 'کشاورزی و دامپروری', 'slug': 'agriculture', 'icon': 'agriculture', 'color': '#15803d', 'jv': 'agriculture', 'es': 'کشاورزی', 'itl': 'agriculture', 'sort': 40,
-     'skills': ['Agriculture','Irrigation','Pest Control','Crop Management','Livestock','Farm Management','Organic Farming','Agricultural Machinery'],
-     'positions': ['Agricultural Engineer','Farm Manager','Agronomist','Veterinarian','Irrigation Specialist'],
-     'kw_fa': ['کشاورزی','دامپروری','دامی','زراعت'], 'kw_en': ['agriculture','farming','livestock','irrigation','agronomy']},
+    # Level 3: Frontend
+    _c('eng-frontend', 'توسعه‌دهنده فرانت‌اند', parent_slug='eng-computer', icon='frontend', color='#f59e0b', sort_order=2,
+       skills=['HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'Vue.js',
+               'Angular', 'Next.js', 'Nuxt.js', 'Tailwind CSS', 'SASS',
+               'Webpack', 'Vite', 'Responsive Design', 'PWA'],
+       positions=['طراح و توسعه‌دهنده وب', 'فرانت‌اند دولوپر', 'Frontend Developer',
+                  'React Developer', 'UI Developer'],
+       keywords_fa=['فرانت‌اند', 'وب', 'رابط کاربری', 'React', 'ویو'],
+       keywords_en=['frontend', 'web', 'react', 'vue', 'angular', 'ui'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی IT', 'مدرک معادل'],
+       salary_range='۱۵ - ۵۰ میلیون تومان',
+       career_path='Junior Frontend → Frontend Dev → Senior Frontend → Frontend Architect → UI/UX Tech Lead',
+       jobvision_slug='frontend', irantalent_slug='frontend'),
 
-    # ===== ترجمه و زبان =====
-    {'name': 'ترجمه و زبان‌های خارجی', 'slug': 'translation', 'icon': 'translation', 'color': '#6d28d9', 'jv': 'content', 'es': 'ترجمه', 'itl': 'translation', 'sort': 41,
-     'skills': ['English','Translation','Interpretation','Proofreading','Localization','Subtitling','CAT Tools','Grammar','Writing'],
-     'positions': ['Translator','Interpreter','Proofreader','Localization Specialist','English Teacher','Subtitler'],
-     'kw_fa': ['ترجمه','زبان','انگلیسی','مترجم'], 'kw_en': ['translation','english','language','interpreter','localization']},
+    # Level 4: React
+    _c('eng-fe-react', 'توسعه‌دهنده ریکت', parent_slug='eng-frontend', icon='frontend', color='#06b6d4', sort_order=1,
+       skills=['React', 'Next.js', 'TypeScript', 'Redux', 'React Query',
+               'Tailwind CSS', 'Jest', 'Cypress', 'Storybook'],
+       positions=['React Developer', 'Next.js Developer', 'Frontend Engineer'],
+       keywords_en=['react', 'next.js', 'redux'],
+       salary_range='۲۰ - ۶۰ میلیون تومان'),
 
-    # ===== اداری و دفتری =====
-    {'name': 'اداری و دفتری', 'slug': 'administrative', 'icon': 'content', 'color': '#64748b', 'jv': 'administrative', 'es': 'اداری', 'sort': 42,
-     'skills': ['Microsoft Office','Excel','Word','PowerPoint','Data Entry','Filing','Scheduling','Communication','Organization'],
-     'positions': ['Secretary','Office Manager','Administrative Assistant','Receptionist','Data Entry Operator','Clerk'],
-     'kw_fa': ['اداری','دفتری','منشی','بایگانی'], 'kw_en': ['administrative','office','secretary','clerk','data entry']},
-    {'name': 'گردشگری و هتلداری', 'slug': 'tourism-hospitality', 'icon': 'customer-service', 'color': '#0891b2', 'jv': 'customer-service', 'es': 'گردشگری', 'sort': 43,
-     'skills': ['Hospitality','Customer Service','Tour Planning','Hotel Management','Booking Systems','Languages','Event Planning','Food Service'],
-     'positions': ['Tour Guide','Hotel Manager','Travel Agent','Receptionist','Event Coordinator','Chef'],
-     'kw_fa': ['گردشگری','هتل','تور','مسافرت'], 'kw_en': ['tourism','hospitality','hotel','travel','guide']},
+    # Level 4: Vue.js
+    _c('eng-fe-vue', 'توسعه‌دهنده ویو', parent_slug='eng-frontend', icon='frontend', color='#22c55e', sort_order=2,
+       skills=['Vue.js', 'Nuxt.js', 'Vuex', 'Pinia', 'Vuetify', 'TypeScript'],
+       positions=['Vue Developer', 'Nuxt Developer'],
+       keywords_en=['vue', 'nuxt'],
+       salary_range='۱۵ - ۴۵ میلیون تومان'),
 
-    # ===== رسانه و هنر =====
-    {'name': 'روزنامه‌نگاری و رسانه', 'slug': 'journalism', 'icon': 'content', 'color': '#be123c', 'jv': 'content', 'es': 'رسانه', 'sort': 44,
-     'skills': ['Journalism','News Writing','Editing','Investigative Reporting','Social Media','SEO','Photography','Video','Interviewing'],
-     'positions': ['Journalist','Editor','Reporter','News Anchor','Editor-in-Chief','Content Manager'],
-     'kw_fa': ['روزنامه‌نگاری','رسانه','خبر','تحریریه'], 'kw_en': ['journalism','media','news','reporting','editing']},
+    # Level 3: Mobile Dev
+    _c('eng-mobile', 'توسعه‌دهنده موبایل', parent_slug='eng-computer', icon='mobile', color='#ec4899', sort_order=3,
+       skills=['Flutter', 'React Native', 'Swift', 'Kotlin', 'Dart',
+               'iOS', 'Android', 'Firebase', 'REST API', 'SQLite'],
+       positions:['توسعه‌دهنده موبایل', 'Mobile Developer', 'iOS Developer',
+                  'Android Developer', 'Flutter Developer'],
+       keywords_fa=['موبایل', 'اندروید', 'آی‌او‌اس', 'فلاتر'],
+       keywords_en=['mobile', 'android', 'ios', 'flutter', 'react native'],
+       education=['کارشناسی مهندسی کامپیوتر', 'کارشناسی IT'],
+       salary_range='۲۰ - ۶۰ میلیون تومان',
+       career_path='Junior Mobile → Mobile Dev → Senior Mobile → Mobile Tech Lead',
+       jobvision_slug='mobile', irantalent_slug='mobile'),
 
-    # ===== خدمات فنی و ساختمان =====
-    {'name': 'خدمات فنی و ساختمان', 'slug': 'trades', 'icon': 'construction', 'color': '#92400e', 'jv': 'engineering', 'es': 'ساختمان', 'sort': 45,
-     'skills': ['Welding','Plumbing','Electrical Wiring','Painting','Masonry','Carpentry','HVAC','Building Maintenance','Safety'],
-     'positions': ['Technician','Electrician','Plumber','Welder','Carpenter','HVAC Technician','Building Manager'],
-     'kw_fa': ['فنی','ساختمان','تاسیسات','لوله‌کشی','برق‌کاری'], 'kw_en': ['trades','construction','maintenance','technician','plumbing']},
+    # Level 3: DevOps/Cloud
+    _c('eng-devops', 'داوآپس و زیرساخت', parent_slug='eng-computer', icon='devops', color='#f97316', sort_order=4,
+       skills=['Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP', 'Linux',
+               'CI/CD', 'Jenkins', 'GitHub Actions', 'Terraform', 'Ansible',
+               'Prometheus', 'Grafana', 'Nginx'],
+       positions=['مهندس داوآپس', 'DevOps Engineer', 'Cloud Engineer',
+                  'Site Reliability Engineer', 'SRE'],
+       keywords_fa=['داوآپس', 'زیرساخت', 'اکس', 'دکر', 'کوبرنیتیس'],
+       keywords_en=['devops', 'cloud', 'aws', 'docker', 'kubernetes', 'sre'],
+       education=['کارشناسی مهندسی کامپیوتر', 'شبکه', 'مجوز AWS/Azure'],
+       salary_range='۲۵ - ۸۰ میلیون تومان',
+       career_path='Sysadmin → DevOps → Senior DevOps → Cloud Architect → SRE',
+       jobvision_slug='devops', irantalent_slug='devops'),
 
-    # ===== علمی و آزمایشگاهی =====
-    {'name': 'علوم آزمایشگاهی و محیط زیست', 'slug': 'lab-environment', 'icon': 'science', 'color': '#047857', 'jv': 'healthcare', 'es': 'آزمایشگاه', 'sort': 46,
-     'skills': ['Laboratory','HSE','Environmental Science','Chemistry','Biology','Quality Control','ISO','Safety Standards','Waste Management'],
-     'positions': ['Lab Technician','HSE Officer','Environmental Engineer','Quality Inspector','Safety Officer'],
-     'kw_fa': ['آزمایشگاه','محیط زیست','HSE','ایمنی'], 'kw_en': ['laboratory','environment','hse','safety','quality']},
+    # Level 3: AI/ML
+    _c('eng-ai', 'هوش مصنوعی و یادگیری ماشین', parent_slug='eng-computer', icon='ai', color='#a855f7', sort_order=5,
+       skills=['Python', 'TensorFlow', 'PyTorch', 'Scikit-learn', 'NLP',
+               'Computer Vision', 'Deep Learning', 'Pandas', 'NumPy',
+               'OpenCV', 'Hugging Face', 'LangChain', 'LLM', 'RAG'],
+       positions=['مهندس هوش مصنوعی', 'AI Engineer', 'ML Engineer',
+                  'Data Scientist', 'NLP Engineer', 'LLM Engineer'],
+       keywords_fa=['هوش مصنوعی', 'یادگیری ماشین', 'دیتا ساینس', 'NLP', 'تعلم عمیق'],
+       keywords_en=['artificial intelligence', 'machine learning', 'deep learning', 'AI', 'ML', 'NLP', 'LLM'],
+       education=['کارشناسی ارشد هوش مصنوعی', 'دکتری ML', 'کارشناسی مهندسی کامپیوتر'],
+       salary_range='۲۵ - ۱۰۰ میلیون تومان',
+       career_path='ML Research → ML Engineer → Senior ML → AI Lead → AI Director',
+       jobvision_slug='ai', irantalent_slug='data-science'),
 
-    # ===== سایر =====
-    {'name': 'سایر', 'slug': 'other', 'icon': 'other', 'color': '#94a3b8', 'sort': 99,
-     'skills': [], 'positions': [], 'kw_fa': [], 'kw_en': []},
+    # Level 2: IT Engineering
+    _c('eng-it', 'مهندسی فناوری اطلاعات', parent_slug='eng', icon='network', color='#0ea5e9', sort_order=2,
+       keywords_fa=['فناوری اطلاعات', 'IT'], keywords_en=['IT', 'information technology'],
+       education=['کارشناسی IT', 'کارشناسی ارشد IT']),
+
+    # Level 3: Network
+    _c('eng-it-network', 'شبکه و زیرساخت', parent_slug='eng-it', icon='network', color='#0ea5e9', sort_order=1,
+       skills=['Cisco', 'Mikrotik', 'Linux', 'Windows Server', 'Firewall',
+               'TCP/IP', 'DNS', 'VPN', 'VLAN', 'BGP', 'OSPF'],
+       positions=['مهندس شبکه', 'Network Engineer', 'Network Admin', 'Sysadmin'],
+       keywords_fa=['شبکه', 'سیسکو', 'میکروتیک', 'فایروال'],
+       keywords_en=['network', 'cisco', 'mikrotik', 'firewall', 'system admin'],
+       education=['کارشناسی IT', 'مجوز CCNA/CCNP'],
+       salary_range='۱۵ - ۴۵ میلیون تومان',
+       jobvision_slug='network', irantalent_slug='network'),
+
+    # Level 2: Electrical Engineering
+    _c('eng-electrical', 'مهندسی برق', parent_slug='eng', icon='engineering', color='#eab308', sort_order=3,
+       keywords_fa=['مهندسی برق', 'الکترونیک'], keywords_en=['electrical engineering', 'electronics'],
+       education=['کارشناسی مهندسی برق']),
+
+    # Level 3: Embedded
+    _c('eng-elec-embedded', 'الکترونیک و تعبیه‌شده', parent_slug='eng-electrical', icon='engineering', color='#eab308', sort_order=1,
+       skills=['C', 'C++', 'Embedded C', 'Microcontroller', 'PCB', 'Arduino',
+               'Raspberry Pi', 'IoT', 'ARM', 'FPGA', 'Verilog', 'MATLAB'],
+       positions=['مهندس الکترونیک', 'Embedded Engineer', 'IoT Developer'],
+       keywords_fa=['الکترونیک', 'تعبیه‌شده', 'IoT', 'آردوینو'],
+       keywords_en=['embedded', 'electronics', 'iot', 'microcontroller'],
+       education=['کارشناسی مهندسی برق'],
+       salary_range='۱۵ - ۵۰ میلیون تومان'),
+
+    # ── Level 1: Design (طراحی) ──
+    _c('design', 'طراحی و خلاقیت', icon='design', color='#ec4899', sort_order=20,
+       keywords_fa=['طراحی', 'خلاقیت', 'گرافیک'], keywords_en=['design', 'creative', 'graphic']),
+
+    # Level 2: UI/UX
+    _c('design-uiux', 'طراحی رابط و تجربه کاربری', parent_slug='design', icon='design', color='#f472b6', sort_order=1,
+       skills=['Figma', 'Adobe XD', 'Sketch', 'Prototyping', 'Wireframing',
+               'User Research', 'A/B Testing', 'Design Systems', 'HTML/CSS'],
+       positions=['طراح UI/UX', 'UX Researcher', 'UI Designer', 'Product Designer'],
+       keywords_fa=['رابط کاربری', 'تجربه کاربری', 'UI', 'UX', 'فیگما'],
+       keywords_en=['ui/ux', 'user experience', 'figma', 'product design'],
+       education=['کارشناسی طراحی گرافیک', 'ارشد HCI', 'مدرک UX'],
+       salary_range='۱۵ - ۵۰ میلیون تومان',
+       career_path='Junior Designer → UI Designer → UX Designer → UX Lead → Design Director',
+       jobvision_slug='ui-ux', irantalent_slug='ui-ux-design'),
+
+    # Level 2: Graphic Design
+    _c('design-graphic', 'طراحی گرافیک', parent_slug='design', icon='design', color='#a855f7', sort_order=2,
+       skills=['Photoshop', 'Illustrator', 'After Effects', 'InDesign',
+               'Premiere Pro', 'CorelDRAW', 'Branding', 'Typography'],
+       positions=['طراح گرافیک', 'Graphic Designer', 'Visual Designer', 'Art Director'],
+       keywords_fa=['طراحی گرافیک', 'فتوشاپ', 'ایلوستریتور'],
+       keywords_en=['graphic design', 'photoshop', 'illustrator', 'branding'],
+       education=['کارشناسی طراحی گرافیک', 'هنر'],
+       salary_range='۱۰ - ۳۵ میلیون تومان',
+       jobvision_slug='graphic-design', irantalent_slug='graphic-design'),
+
+    # ── Level 1: Marketing (بازاریابی) ──
+    _c('marketing', 'بازاریابی و فروش', icon='marketing', color='#f97316', sort_order=30,
+       keywords_fa=['بازاریابی', 'فروش', 'مارکتینگ'], keywords_en=['marketing', 'sales']),
+
+    # Level 2: Digital Marketing
+    _c('marketing-digital', 'دیجیتال مارکتینگ', parent_slug='marketing', icon='marketing', color='#fb923c', sort_order=1,
+       skills=['Google Ads', 'Facebook Ads', 'SEO', 'Google Analytics',
+               'Social Media', 'Content Marketing', 'Email Marketing', 'A/B Testing'],
+       positions=['مدیر دیجیتال مارکتینگ', 'Digital Marketer', 'SEO Specialist', 'Content Marketer'],
+       keywords_fa=['دیجیتال مارکتینگ', 'سئو', 'تبلیغات گوگل', 'بازاریابی محتوایی'],
+       keywords_en=['digital marketing', 'seo', 'google ads', 'content marketing'],
+       education=['کارشناسی مدیریت بازرگانی', 'مدرک گوگل', 'حوزه مرتبط'],
+       salary_range='۱۵ - ۵۰ میلیون تومان',
+       career_path='Digital Marketer → SEO Specialist → Digital Marketing Manager → CMO',
+       jobvision_slug='digital-marketing', irantalent_slug='digital-marketing'),
+
+    # Level 2: Sales
+    _c('marketing-sales', 'فروش و توسعه کسب‌وکار', parent_slug='marketing', icon='sales', color='#f59e0b', sort_order=2,
+       skills=['CRM', 'B2B Sales', 'Negotiation', 'Business Development',
+               'Cold Calling', 'Account Management', 'Sales Funnel'],
+       positions=['کارشناس فروش', 'Sales Manager', 'Business Development', 'Account Manager'],
+       keywords_fa=['فروش', 'توسعه کسب‌وکار', 'B2B'],
+       keywords_en=['sales', 'business development', 'B2B', 'account manager'],
+       education=['کارشناسی مدیریت', 'MBA'],
+       salary_range='۱۰ - ۶۰ میلیون تومان (با پورسانت)'),
+       jobvision_slug='sales', irantalent_slug='sales'),
+
+    # ── Level 1: Data & Analytics ──
+    _c('data', 'داده و تحلیل', icon='data', color='#14b8a6', sort_order=40,
+       keywords_fa=['داده', 'تحلیل', 'بیگ‌دیتا'], keywords_en=['data', 'analytics', 'big data']),
+
+    # Level 2: Data Science
+    _c('data-science', 'علم داده', parent_slug='data', icon='data', color='#14b8a6', sort_order=1,
+       skills=['Python', 'R', 'SQL', 'Machine Learning', 'Statistics',
+               'Pandas', 'NumPy', 'Matplotlib', 'Tableau', 'Power BI'],
+       positions=['داده‌پرداز', 'Data Scientist', 'Data Analyst', 'BI Analyst'],
+       keywords_fa=['علم داده', 'داده‌پرداز', 'تحلیل داده', 'بیگ‌دیتا'],
+       keywords_en=['data science', 'data analyst', 'big data', 'analytics'],
+       education=['کارشناسی ارشد آمار', 'ارشد علوم داده', 'دکتری'],
+       salary_range='۲۰ - ۷۰ میلیون تومان',
+       career_path='Data Analyst → Data Scientist → Senior Data Scientist → Head of Data',
+       jobvision_slug='data-science', irantalent_slug='data-science'),
+
+    # Level 2: Database
+    _c('data-dba', 'مدیریت دیتابیس', parent_slug='data', icon='data', color='#0d9488', sort_order=2,
+       skills=['PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'SQL Server',
+               'Elasticsearch', 'Database Design', 'Backup & Recovery', 'Performance Tuning'],
+       positions=['مدیر دیتابیس', 'DBA', 'Database Engineer'],
+       keywords_fa=['دیتابیس', 'DBA', 'پایگاه داده'],
+       keywords_en=['database', 'DBA', 'postgresql', 'mongodb'],
+       education=['کارشناسی IT', 'مجوز Oracle/Microsoft'],
+       salary_range='۲۰ - ۶۰ میلیون تومان'),
+
+    # ── Level 1: QA & Testing ──
+    _c('qa', 'تست و تضمین کیفیت', icon='qa', color='#6366f1', sort_order=50,
+       skills=['Selenium', 'Cypress', 'Playwright', 'Jira', 'API Testing',
+               'Performance Testing', 'Manual Testing', 'Test Planning', 'SQL'],
+       positions=['تستر نرم‌افزار', 'QA Engineer', 'SDET', 'Test Lead'],
+       keywords_fa=['تست', 'تضمین کیفیت', 'QA', 'تست نرم‌افزار'],
+       keywords_en=['qa', 'testing', 'selenium', 'quality assurance'],
+       education=['کارشناسی مهندسی کامپیوتر', 'مدرک ISTQB'],
+       salary_range='۱۵ - ۴۵ میلیون تومان',
+       career_path='Manual Tester → QA Engineer → SDET → QA Lead → QA Manager',
+       jobvision_slug='qa', irantalent_slug='qa'),
+
+    # ── Level 1: Cybersecurity ──
+    _c('security', 'امنیت سایبری', icon='security', color='#dc2626', sort_order=55,
+       skills=['Penetration Testing', 'Network Security', 'OWASP', 'Firewall',
+               'SIEM', 'Incident Response', 'Burp Suite', 'Kali Linux', 'CTF'],
+       positions=['متخصص امنیت', 'Security Engineer', 'Penetration Tester', 'SOC Analyst'],
+       keywords_fa=['امنیت سایبری', 'تست نفوذ', 'فایروال'],
+       keywords_en=['cybersecurity', 'penetration testing', 'security', 'pentest'],
+       education=['کارشناسی مهندسی کامپیوتر', 'مجوز CEH/OSCP'],
+       salary_range='۲۰ - ۷۰ میلیون تومان',
+       career_path='SOC Analyst → Security Engineer → Pentester → Security Architect → CISO',
+       jobvision_slug='security', irantalent_slug='cybersecurity'),
+
+    # ── Level 1: Management (مدیریت) ──
+    _c('management', 'مدیریت و رهبری', icon='management', color='#8b5cf6', sort_order=60,
+       keywords_fa=['مدیریت', 'رهبری', 'مدیر پروژه'], keywords_en=['management', 'leadership', 'PM']),
+
+    # Level 2: Product Management
+    _c('mgmt-product', 'مدیر محصول', parent_slug='management', icon='management', color='#8b5cf6', sort_order=1,
+       skills=['Product Strategy', 'Roadmapping', 'Agile', 'Scrum', 'User Stories',
+               'A/B Testing', 'Data Analysis', 'Stakeholder Management'],
+       positions=['مدیر محصول', 'Product Manager', 'Product Owner'],
+       keywords_fa=['مدیر محصول', 'پروادکت منیجر'],
+       keywords_en=['product manager', 'product owner', 'PM'],
+       education=['کارشناسی ارشد MBA', 'مهندسی صنایع'],
+       salary_range='۳۰ - ۱۰۰ میلیون تومان',
+       career_path='PO → PM → Senior PM → Head of Product → VP Product'),
+
+    # Level 2: Project Management
+    _c('mgmt-project', 'مدیر پروژه', parent_slug='management', icon='management', color='#a78bfa', sort_order=2,
+       skills=['Agile', 'Scrum', 'Kanban', 'Jira', 'Risk Management',
+               'Budgeting', 'Resource Planning', 'Stakeholder Comm.'],
+       positions=['مدیر پروژه', 'Project Manager', 'Scrum Master'],
+       keywords_fa=['مدیر پروژه', 'اسکرام مستر', 'آجایل'],
+       keywords_en=['project manager', 'scrum master', 'agile', 'PMP'],
+       education=['MBA', 'PMP', 'مدرک Scrum'],
+       salary_range='۲۵ - ۸۰ میلیون تومان'),
+
+    # ── Level 1: Finance ──
+    _c('finance', 'مالی و حسابداری', icon='finance', color='#10b981', sort_order=70,
+       skills=['Excel', 'Accounting', 'Financial Analysis', 'Tax', 'Audit',
+               'SAP', 'ERP', 'Budgeting', 'Reporting'],
+       positions=['حسابدار', 'مدیر مالی', 'Financial Analyst', 'Accountant'],
+       keywords_fa=['حسابداری', 'مالی', 'حسابرسی'],
+       keywords_en=['accounting', 'finance', 'audit', 'financial analyst'],
+       education=['کارشناسی حسابداری', 'MBA', 'CPA'],
+       salary_range='۱۵ - ۵۰ میلیون تومان',
+       jobvision_slug='accounting', irantalent_slug='accounting'),
+
+    # ── Level 1: HR ──
+    _c('hr', 'منابع انسانی', icon='hr', color='#f43f5e', sort_order=80,
+       skills=['Recruiting', 'Onboarding', 'Payroll', 'Labor Law',
+               'Performance Review', 'Training', 'HRIS', 'Organizational Design'],
+       positions:['کارشناس منابع انسانی', 'HR Manager', 'Recruiter', 'Talent Acquisition'],
+       keywords_fa=['منابع انسانی', 'نیروی انسانی', 'استخدام'],
+       keywords_en=['HR', 'human resources', 'recruiting', 'talent acquisition'],
+       education=['کارشناسی مدیریت منابع انسانی', 'ارشد MBA'],
+       salary_range='۱۵ - ۵۰ میلیون تومان',
+       jobvision_slug='hr', irantalent_slug='human-resources'),
+
+    # ── Level 1: Content ──
+    _c('content', 'تولید محتوا', icon='content', color='#f97316', sort_order=90,
+       skills=['Copywriting', 'SEO Writing', 'Social Media', 'WordPress',
+               'Video Editing', 'Photography', 'Canva', 'Content Strategy'],
+       positions=['تولیدکننده محتوا', 'Content Writer', 'Copywriter', 'Content Manager'],
+       keywords_fa=['تولید محتوا', 'نویسندگی', 'کپی‌رایتینگ'],
+       keywords_en=['content writing', 'copywriting', 'content marketing'],
+       education=['کارشناسی ارتباطات', 'مدرک مرتبط'],
+       salary_range='۸ - ۳۰ میلیون تومان'),
+
+    # ── Game Dev ──
+    _c('eng-game', 'توسعه بازی', parent_slug='eng-computer', icon='game', color='#8b5cf6', sort_order=6,
+       skills=['Unity', 'Unreal Engine', 'C#', 'C++', 'Blender', 'Game Design',
+               'Physics Engine', '3D Modeling', 'Animation'],
+       positions:['برنامه‌نویس بازی', 'Game Developer', 'Unity Developer'],
+       keywords_fa=['بازی', 'گیم', 'یونیتی', 'آنریل'],
+       keywords_en=['game development', 'unity', 'unreal engine'],
+       education=['کارشناسی مهندسی کامپیوتر', 'گیم دیزاین'],
+       salary_range='۱۵ - ۵۰ میلیون تومان'),
 ]
 
-# Job tree enrichment data: education, certifications, salary range, career path
-TREE_DATA = {
-    'developer': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۵ تا ۷۰ میلیون تومان', 'path': 'جونیور > میان‌رده > ارشد > Tech Lead > CTO'},
-    'frontend': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'جونیور فرانت > ارشد فرانت > Lead Frontend > Frontend Architect'},
-    'backend': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'جونیور بک‌اند > ارشد بک‌اند > Tech Lead > Software Architect'},
-    'mobile': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۵ تا ۵۵ میلیون تومان', 'path': 'جونیور موبایل > ارشد موبایل > Mobile Lead > Mobile Architect'},
-    'data-science': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': ['Google Data Analytics'], 'salary': '۲۰ تا ۸۰ میلیون تومان', 'path': 'تحلیلگر داده > دانشمند داده > Senior Data Scientist > Head of Data'},
-    'ai-ml': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': ['TensorFlow Certificate', 'AWS ML'], 'salary': '۲۵ تا ۱۰۰ میلیون تومان', 'path': 'ML Engineer > Senior ML > AI Lead > AI Director'},
-    'devops': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['AWS Solutions Architect', 'Docker Certified', 'Kubernetes CKA'], 'salary': '۲۰ تا ۷۰ میلیون تومان', 'path': 'DevOps Junior > DevOps Engineer > SRE > Platform Engineer > DevOps Lead'},
-    'network': {'edu': ['کارشناسی', 'Bachelor', 'Network+'], 'certs': ['CCNA', 'CCNP', 'MikroTik MTCNA'], 'salary': '۱۰ تا ۴۵ میلیون تومان', 'path': 'تکنسین شبکه > مهندس شبکه > مدیر شبکه > IT Manager'},
-    'security': {'edu': ['کارشناسی ارشد', 'Master'], 'certs': ['CEH', 'OSCP', 'CompTIA Security+'], 'salary': '۲۵ تا ۹۰ میلیون تومان', 'path': 'تحلیلگر امنیت > مهندس امنیت > Security Lead > CISO'},
-    'qa-testing': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['ISTQB'], 'salary': '۱۰ تا ۴۰ میلیون تومان', 'path': 'تستر دستی > تستر اتومیشن > QA Lead > SDET Lead > Head of QA'},
-    'game-dev': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'جونیور بازی > گیم دولوپر > سینیر گیمر > Lead Game Developer > Technical Director'},
-    'database': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['Oracle OCP', 'PostgreSQL Certified'], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'DBA Junior > DBA > Senior DBA > Database Architect > Data Platform Lead'},
-    'ui-ux': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['Google UX Design'], 'salary': '۱۰ تا ۴۵ میلیون تومان', 'path': 'طراحح مبتدی > UI Designer > UX Designer > Product Designer > Design Director'},
-    'web-design': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۸ تا ۳۵ میلیون تومان', 'path': 'طراح وب مبتدی > طراح وب > ارشد طراح وب > Art Director'},
-    'animation': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۰ تا ۴۰ میلیون تومان', 'path': 'انیماتور مبتدی > انیماتور > ارشد > Animation Director'},
-    'photography': {'edu': ['دیپلم', 'Associate'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'عکاس مبتدی > عکاس حرفه‌ای > سرپرست تیم > استودیو'},
-    'digital-marketing': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['Google Ads', 'Google Analytics', 'HubSpot'], 'salary': '۱۰ تا ۵۰ میلیون تومان', 'path': 'بازاریاب مبتدی > متخصص دیجیتال > مدیر بازاریابی > CMO'},
-    'sales': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': [], 'salary': '۱۰ تا ۶۰ میلیون تومان', 'path': 'فروشنده > نماینده > مدیر فروش > Sales Director > VP Sales'},
-    'pr-branding': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': [], 'salary': '۱۲ تا ۴۵ میلیون تومان', 'path': 'کارشناس PR > مدیر PR > Brand Manager > Communications Director'},
-    'content': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۸ تا ۳۵ میلیون تومان', 'path': 'نویسنده مبتدی > کپی‌رایتر > Content Manager > Head of Content'},
-    'accounting': {'edu': ['کارشناسی', 'Bachelor'], 'certs': ['CMA', 'ACCA', 'CIA'], 'salary': '۱۰ تا ۴۵ میلیون تومان', 'path': 'حسابدار > حسابدار ارشد > مدیر مالی > CFO'},
-    'trade-finance': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': ['CFA'], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'تحلیلگر مالی > مدیر مالی > CFO'},
-    'finance': {'edu': ['کارشناسی ارشد', 'Master', 'MBA'], 'certs': ['CFA', 'FRM'], 'salary': '۲۰ تا ۸۰ میلیون تومان', 'path': 'تحلیلگر > مدیر سرمایه‌گذاری > مدیر عامل مالی'},
-    'hr': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': ['SHRM', 'PHR'], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'کارشناس HR > مدیر HR > HR Business Partner > CHRO'},
-    'management': {'edu': ['کارشناسی ارشد', 'Master', 'MBA'], 'certs': ['PMP'], 'salary': '۲۵ تا ۱۰۰ میلیون تومان', 'path': 'مدیر عملیات > مدیر ارشد > مدیرعامل > CEO'},
-    'project-mgmt': {'edu': ['کارشناسی', 'Bachelor', 'MBA'], 'certs': ['PMP', 'PRINCE2', 'Scrum Master'], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'هماهنگ‌کننده > مدیر پروژه > Senior PM > PMO Director'},
-    'civil-eng': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'مهندس مبتدی > مهندس ارشد > مدیر پروژه > مدیر فنی'},
-    'industrial-eng': {'edu': ['کارشناسی', 'Master'], 'certs': [], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'مهندس صنایع > ارشد > مدیر تولید > مدیر کارخانه'},
-    'mechanical-eng': {'edu': ['کارشناسی', 'Master'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'مهندس مکانیک > ارشد > مدیر مهندسی > مدیر فنی'},
-    'electrical-eng': {'edu': ['کارشناسی', 'Master'], 'certs': [], 'salary': '۱۲ تا ۵۰ میلیون تومان', 'path': 'مهندس برق > ارشد > مدیر پروژه برق > مدیر فنی'},
-    'medical': {'edu': ['دکترای عمومی', 'MD', 'GP'], 'certs': ['بورد تخصصی'], 'salary': '۲۵ تا ۱۵۰ میلیون تومان', 'path': 'پزشک عمومی > متخصص > فوق تخصص > استاد دانشگاه'},
-    'nursing': {'edu': ['کارشناسی پرستاری', 'BSc Nursing'], 'certs': [], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'پرستار > سرپرستار > مدیر پرستاری > مدیر آموزش پرستاری'},
-    'pharmacy-lab': {'edu': ['دکترای داروسازی', 'PharmD'], 'certs': [], 'salary': '۱۵ تا ۵۰ میلیون تومان', 'path': 'داروساز > مسئول فنی > مدیر آزمایشگاه > مدیر داروخانه'},
-    'education': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'معلم > استاد > استادیار > دانشیار > استاد تمام'},
-    'research': {'edu': ['کارشناسی ارشد', 'Master', 'PhD'], 'certs': [], 'salary': '۱۵ تا ۴۰ میلیون تومان', 'path': 'محقق > پژوهشگر ارشد > استادیار > استاد'},
-    'legal': {'edu': ['کارشناسی ارشد', 'Master', 'PhD Law'], 'certs': ['گذرنامه وکالت'], 'salary': '۱۵ تا ۶۰ میلیون تومان', 'path': 'کارآموز وکالت > وکیل > وکیل ارشد > شریک دفتر > قاضی'},
-    'logistics': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۱۰ تا ۴۰ میلیون تومان', 'path': 'کارشناس لجستیک > مدیر انبار > مدیر لجستیک > مدیر کل زنجیره تامین'},
-    'agriculture': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'مهندس کشاورزی > کارشناس ارشد > مدیر مزرعه > مشاور'},
-    'translation': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'مترجم مبتدی > مترجم حرفه‌ای > مترجم ارشد > مدیر تیم ترجمه'},
-    'administrative': {'edu': ['دیپلم', 'Associate', 'Bachelor'], 'certs': ['ICDL'], 'salary': '۸ تا ۲۵ میلیون تومان', 'path': 'کارشناس اداری > منشی > مدیر دفتر > مدیر اداری'},
-    'tourism-hospitality': {'edu': ['کارشناسی', 'Bachelor'], 'certs': [], 'salary': '۸ تا ۳۰ میلیون تومان', 'path': 'کارشناس هتل > مدیر رزرویشن > مدیر هتل > مدیر گردشگری'},
-    'journalism': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': [], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'خبرنگار مبتدی > گزارشگر > سردبیر > سردبیر ارشد > مدیر تحریریه'},
-    'trades': {'edu': ['دیپلم فنی', 'فوق دیپلم'], 'certs': [], 'salary': '۸ تا ۲۵ میلیون تومان', 'path': 'شاگرد > تکنسین > استادکار > سرپرست کارگاه'},
-    'lab-environment': {'edu': ['کارشناسی', 'Bachelor', 'Master'], 'certs': ['HSE', 'ISO 14001'], 'salary': '۱۰ تا ۳۵ میلیون تومان', 'path': 'تکنسین آزمایشگاه > کارشناس HSE > مدیر HSE > مدیر محیط زیست'},
-}
+
+# ──────────────────────────────────────────────────
+# TREE 2: Skills-Based (درخت مهارتی)
+# Tech Area → Specialization → Tools → Jobs
+# This tree is organized by SKILL CLUSTERS, not education.
+# ──────────────────────────────────────────────────
+SKILLS_TREE = [
+    # Root: Programming Languages
+    _c('sk-prog', 'زبان‌های برنامه‌نویسی', icon='developer', color='#6366f1', sort_order=100,
+       keywords_fa=['برنامه‌نویسی', 'کدنویسی'], keywords_en=['programming', 'coding']),
+
+    _c('sk-prog-python', 'پایتون', parent_slug='sk-prog', icon='developer', color='#22c55e', sort_order=1,
+       skills=['Python', 'Django', 'Flask', 'FastAPI', 'Pandas', 'NumPy', 'Pytest'],
+       positions=['Python Developer', 'Backend Developer', 'Data Scientist', 'ML Engineer'],
+       keywords_en=['python', 'django', 'flask'],
+       jobvision_slug='python', irantalent_slug='python'),
+
+    _c('sk-prog-js', 'جاوا اسکریپت / تایپ‌اسکریپت', parent_slug='sk-prog', icon='frontend', color='#eab308', sort_order=2,
+       skills=['JavaScript', 'TypeScript', 'Node.js', 'React', 'Vue.js', 'Next.js'],
+       positions=['Frontend Developer', 'Full Stack Developer', 'Node Developer'],
+       keywords_en=['javascript', 'typescript', 'node.js']),
+
+    _c('sk-prog-java', 'جاوا', parent_slug='sk-prog', icon='developer', color='#ef4444', sort_order=3,
+       skills=['Java', 'Spring Boot', 'Maven', 'Hibernate'],
+       positions=['Java Developer', 'Backend Engineer'],
+       keywords_en=['java', 'spring'],
+       jobvision_slug='java', irantalent_slug='java'),
+
+    _c('sk-prog-csharp', 'سی‌شارپ و دات‌نت', parent_slug='sk-prog', icon='developer', color='#7c3aed', sort_order=4,
+       skills=['C#', '.NET', 'ASP.NET', 'Blazor', 'Entity Framework'],
+       positions=['.NET Developer', 'C# Developer'],
+       keywords_en=['c#', '.net'],
+       jobvision_slug='csharp'),
+
+    _c('sk-prog-php', 'پی‌اچ‌پی', parent_slug='sk-prog', icon='developer', color='#6366f1', sort_order=5,
+       skills=['PHP', 'Laravel', 'WordPress', 'MySQL'],
+       positions=['PHP Developer', 'Laravel Developer'],
+       keywords_en=['php', 'laravel']),
+
+    _c('sk-prog-mobile-lang', 'کاتلین و سوئیفت', parent_slug='sk-prog', icon='mobile', color='#ec4899', sort_order=6,
+       skills=['Kotlin', 'Swift', 'Android SDK', 'iOS SDK'],
+       positions=['Android Developer', 'iOS Developer'],
+       keywords_en=['kotlin', 'swift', 'android', 'ios']),
+
+    # Root: Cloud & DevOps
+    _c('sk-cloud', 'ابر و داوآپس', icon='devops', color='#f97316', sort_order=110,
+       skills=['Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP', 'Terraform', 'CI/CD'],
+       positions=['DevOps Engineer', 'Cloud Engineer', 'SRE'],
+       keywords_fa=['داوآپس', 'ابر', 'کلاود'],
+       keywords_en=['devops', 'cloud', 'aws', 'docker', 'kubernetes'],
+       jobvision_slug='devops', irantalent_slug='devops'),
+
+    # Root: AI & Data
+    _c('sk-ai', 'هوش مصنوعی و یادگیری ماشین', icon='ai', color='#a855f7', sort_order=120,
+       skills=['Machine Learning', 'Deep Learning', 'NLP', 'LLM', 'TensorFlow', 'PyTorch'],
+       positions=['AI Engineer', 'ML Engineer', 'Data Scientist'],
+       keywords_fa=['هوش مصنوعی', 'یادگیری ماشین'],
+       keywords_en=['AI', 'ML', 'deep learning', 'NLP'],
+       jobvision_slug='ai', irantalent_slug='data-science'),
+
+    # Root: Databases
+    _c('sk-db', 'دیتابیس و ذخیره‌سازی', icon='data', color='#14b8a6', sort_order=130,
+       skills=['PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Elasticsearch', 'SQL Server'],
+       positions=['DBA', 'Database Engineer', 'Backend Developer'],
+       keywords_fa=['دیتابیس', 'پایگاه داده'],
+       keywords_en=['database', 'SQL', 'postgresql', 'mongodb']),
+
+    # Root: Security
+    _c('sk-security', 'امنیت و شبکه', icon='security', color='#dc2626', sort_order=140,
+       skills=['Penetration Testing', 'Network Security', 'Firewall', 'Cisco', 'Linux'],
+       positions=['Security Engineer', 'Pentester', 'Network Engineer'],
+       keywords_fa=['امنیت', 'شبکه', 'تست نفوذ'],
+       keywords_en=['security', 'network', 'penetration testing']),
+]
 
 
 class Command(BaseCommand):
-    help = 'Seed job categories with full tree data'
+    help = 'Seed JobCategory tree (education-based + skills-based). Deletes old data first.'
 
     def handle(self, *args, **options):
-        created = 0
-        updated = 0
-        for c in CATEGORIES:
-            parent_obj = None
-            parent_slug = c.get('parent', '')
-            if parent_slug:
-                parent_obj = JobCategory.objects.filter(slug=parent_slug).first()
+        self.stdout.write('Deleting all existing categories...')
+        JobCategory.objects.all().delete()
 
-            # Get tree enrichment data
-            td = TREE_DATA.get(c['slug'], {})
+        all_cats = EDUCATION_TREE + SKILLS_TREE
+        created = {}
+        count = 0
+
+        for cat_data in all_cats:
+            parent = None
+            if cat_data['parent_slug'] and cat_data['parent_slug'] in created:
+                parent = created[cat_data['parent_slug']]
 
             obj, is_new = JobCategory.objects.update_or_create(
-                slug=c['slug'],
+                slug=cat_data['slug'],
                 defaults={
-                    'name': c['name'],
-                    'parent': parent_obj,
-                    'icon_svg': ICONS.get(c['icon'], ICONS['other']),
-                    'color': c['color'],
-                    'jobvision_slug': c.get('jv', ''),
-                    'estekhdam_slug': c.get('es', ''),
-                    'irantalent_slug': c.get('itl', ''),
-                    'skills': c['skills'],
-                    'positions': c['positions'],
-                    'keywords_fa': c['kw_fa'],
-                    'keywords_en': c['kw_en'],
-                    'education': c.get('edu', td.get('edu', [])),
-                    'certifications': c.get('certs', td.get('certs', [])),
-                    'salary_range': c.get('salary', td.get('salary', '')),
-                    'career_path': c.get('path', td.get('path', '')),
-                    'sort_order': c['sort'],
-                }
+                    'name': cat_data['name'],
+                    'parent': parent,
+                    'icon_svg': cat_data['icon_svg'],
+                    'color': cat_data['color'],
+                    'sort_order': cat_data['sort_order'],
+                    'skills': cat_data['skills'],
+                    'positions': cat_data['positions'],
+                    'keywords_fa': cat_data['keywords_fa'],
+                    'keywords_en': cat_data['keywords_en'],
+                    'education': cat_data['education'],
+                    'certifications': cat_data['certifications'],
+                    'salary_range': cat_data['salary_range'],
+                    'career_path': cat_data['career_path'],
+                    'jobvision_slug': cat_data['jobvision_slug'],
+                    'estekhdam_slug': cat_data['estekhdam_slug'],
+                    'irantalent_slug': cat_data['irantalent_slug'],
+                    'is_active': True,
+                },
             )
-            if is_new:
-                created += 1
-            else:
-                updated += 1
+            created[cat_data['slug']] = obj
+            count += 1
+
+        # Stats
+        roots = JobCategory.objects.filter(parent=None).count()
+        total = JobCategory.objects.count()
+        max_depth = 0
+        for cat in JobCategory.objects.all():
+            d = len(cat.get_full_path().split(' > '))
+            if d > max_depth:
+                max_depth = d
+
         self.stdout.write(self.style.SUCCESS(
-            f'{created} created, {updated} updated. '
-            f'Tree data: {len(TREE_DATA)} categories enriched.'
+            f'Done! {count} categories seeded ({roots} roots, {total} total, max depth={max_depth})'
         ))

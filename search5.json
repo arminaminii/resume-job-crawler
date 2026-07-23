@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://app.jobcast.net/developer/job-categories",
+    "name": "Job Category Instance",
+    "snippet": "Allows you to create a custom job category . Since all custom job categories are company specific, a company property is required. Authentication: Required ... Read more",
+    "host_name": "app.jobcast.net",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://wpjobboard.net/kb/job-categories",
+    "name": "Job Categories | WPJobBoard KB",
+    "snippet": "' Categories ' shows information about the list of job categories with 'Title', 'Slug', 'Total Jobs ' and 'Total Resumes'.",
+    "host_name": "wpjobboard.net",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.quora.com/Is-there-an-API-to-have-all-the-job-categories-and-sub-categories",
+    "name": "Is there an API to have all the job categories and sub",
+    "snippet": "Is there an API to have all the job categories and sub categories?",
+    "host_name": "www.quora.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.aws.amazon.com/cli/latest/reference/macie2/list-classification-jobs.html",
+    "name": "list-classification-jobs",
+    "snippet": "Retrieves a subset of information about one or more classification jobs . Provides information about a classification job , including the current status of the  ...",
+    "host_name": "docs.aws.amazon.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.hirebase.org/docs/api-reference/data/get-categories",
+    "name": "List Job Categories - Hirebase API",
+    "snippet": "Returns every job category used by Hirebase for classifying listings. These are the same values you can pass to the job_category filter on search endpoints. ​. Read more",
+    "host_name": "www.hirebase.org",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developers.cmicglobal.com/apidocs/retrieve-job-categories-by-code",
+    "name": "Retrieve Job Categories By Code",
+    "snippet": "Retrieve Job Categories By Code Documentation. Use this file to discover all available pages before exploring further. +1 (416) 736-0123",
+    "host_name": "developers.cmicglobal.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://servicefusion.zendesk.com/hc/en-us/articles/360028865772-Job-Categories",
+    "name": "Job Categories",
+    "snippet": "May 1, 2024 — Access Job Categories by going to My Office > Job Categories in the far right column at the top! The resulting screen is where your list of ... Read more",
+    "host_name": "servicefusion.zendesk.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developer.goacoustic.com/acoustic-exchange/docs/jobs-api",
+    "name": "Jobs API - Acoustic Developers",
+    "snippet": "This API can be useful if you need a list of all scheduled jobs in a category and their respective job IDs. For example, if you want to delete a scheduled job ... Read more",
+    "host_name": "developer.goacoustic.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developer.servicem8.com/reference/listjobs",
+    "name": "List all Jobs",
+    "snippet": "UUID reference to the job category this job belongs to. Categories help organize jobs by type of work or department. payment_note. string. Not used. Refer to ... Read more",
+    "host_name": "developer.servicem8.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://publicapis.io/best/jobs",
+    "name": "Best Jobs APIs (2026) — Public APIs",
+    "snippet": "Use the API to list jobs, list locations of jobs, job types, jobs at certain companies, and so on. Get results returned back according to Freelance-only or Full time jobs.",
+    "host_name": "publicapis.io",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

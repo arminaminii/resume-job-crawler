@@ -159,7 +159,7 @@
                 </div>
             </div>
 
-            <!-- Filters Card -->
+            <!-- Filters Card (upgraded with cascading location) -->
             <div class="jf-card">
                 <div class="jf-card-header">
                     <h3 class="jf-card-title">
@@ -168,13 +168,63 @@
                     </h3>
                 </div>
                 <div class="jf-filters">
+                    <!-- Province dropdown -->
                     <div class="jf-filter-group">
-                        <label class="jf-filter-label">
+                        <label class="jf-filter-label" for="provinceSelect">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
-                            {{ form.city.label }}
+                            استان
                         </label>
-                        {{ form.city }}
+                        <select name="province" id="provinceSelect" class="form-select modern-select">
+                            {{ form.province }}
+                        </select>
                     </div>
+                    <!-- City dropdown (cascading) -->
+                    <div class="jf-filter-group">
+                        <label class="jf-filter-label" for="citySelect">
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                            شهر
+                        </label>
+                        <select name="city" id="citySelect" class="form-select modern-select" disabled>
+                            <option value="">ابتدا استان را انتخاب کنید</option>
+                        </select>
+                    </div>
+
+                    <!-- Tehran District Section (hidden by default) -->
+                    <div id="tehranDistrictsSection" style="display:none;">
+                        <div class="jf-filter-divider">
+                            <svg viewBox="0 0 20 20" fill="#6366f1" width="14" height="14"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                            مناطق ۲۲ گانه تهران
+                        </div>
+                        <!-- Direction -->
+                        <div class="jf-filter-group">
+                            <label class="jf-filter-label" for="tehranDirectionSelect">
+                                جهت در تهران
+                            </label>
+                            <select name="tehran_direction" id="tehranDirectionSelect" class="form-select modern-select">
+                                <option value="">تمام تهران</option>
+                            </select>
+                        </div>
+                        <!-- District -->
+                        <div class="jf-filter-group" id="districtGroup" style="display:none;">
+                            <label class="jf-filter-label" for="tehranDistrictSelect">
+                                منطقه
+                            </label>
+                            <select name="tehran_district" id="tehranDistrictSelect" class="form-select modern-select">
+                                <option value="">ابتدا جهت را انتخاب کنید</option>
+                            </select>
+                        </div>
+                        <!-- Neighborhood -->
+                        <div class="jf-filter-group" id="neighborhoodGroup" style="display:none;">
+                            <label class="jf-filter-label" for="tehranNeighborhoodSelect">
+                                محله
+                            </label>
+                            <select name="tehran_neighborhood" id="tehranNeighborhoodSelect" class="form-select modern-select">
+                                <option value="">ابتدا منطقه را انتخاب کنید</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Level -->
                     <div class="jf-filter-group">
                         <label class="jf-filter-label">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
@@ -182,6 +232,7 @@
                         </label>
                         {{ form.level }}
                     </div>
+                    <!-- Time Range -->
                     <div class="jf-filter-group">
                         <label class="jf-filter-label">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
@@ -189,6 +240,7 @@
                         </label>
                         {{ form.time_range }}
                     </div>
+                    <!-- Custom Keywords -->
                     <div class="jf-filter-group">
                         <label class="jf-filter-label">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
@@ -221,16 +273,121 @@
         </div>
     </div>
 </form>
+
+<!-- Cascading filter CSS -->
+<style>
+.jf-filter-divider {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 0 6px; margin-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: 13px; font-weight: 600; color: #6366f1;
+}
+#tehranDistrictsSection { animation: fadeSlideIn 0.3s ease; }
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// ── Cascading Province → City → Tehran Districts ──
+// Data loaded from server via JSON endpoint
+
+const provinceData = {{ province_cities_json|safe }};
+const tehranDistricts = {{ tehran_districts_json|safe }};
+
+const provinceSelect = document.getElementById('provinceSelect');
+const citySelect = document.getElementById('citySelect');
+const dirSelect = document.getElementById('tehranDirectionSelect');
+const distSelect = document.getElementById('tehranDistrictSelect');
+const nhSelect = document.getElementById('tehranNeighborhoodSelect');
+const tehranSection = document.getElementById('tehranDistrictsSection');
+const districtGroup = document.getElementById('districtGroup');
+const neighborhoodGroup = document.getElementById('neighborhoodGroup');
+
+// Province → City cascade
+provinceSelect.addEventListener('change', function() {
+    const prov = this.value;
+    citySelect.innerHTML = '';
+    districtGroup.style.display = 'none';
+    neighborhoodGroup.style.display = 'none';
+
+    if (prov && provinceData[prov]) {
+        citySelect.disabled = false;
+        citySelect.innerHTML = '<option value="">همه شهرهای ' + prov + '</option>';
+        const cities = provinceData[prov].cities;
+        const capital = cities[0];
+        const sorted = [...cities].sort((a, b) => a === capital ? -1 : b === capital ? 1 : a.localeCompare(b, 'fa'));
+        sorted.slice(0, 60).forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c; opt.textContent = c;
+            citySelect.appendChild(opt);
+        });
+
+        // Show Tehran districts section
+        if (prov === 'تهران') {
+            tehranSection.style.display = 'block';
+            dirSelect.innerHTML = '<option value="">تمام تهران</option>';
+            Object.keys(tehranDistricts).forEach(dir => {
+                const opt = document.createElement('option');
+                opt.value = dir; opt.textContent = tehranDistricts[dir].label;
+                dirSelect.appendChild(opt);
+            });
+        } else {
+            tehranSection.style.display = 'none';
+        }
+    } else {
+        citySelect.disabled = true;
+        citySelect.innerHTML = '<option value="">ابتدا استان را انتخاب کنید</option>';
+        tehranSection.style.display = 'none';
+    }
+});
+
+// Direction → District cascade
+dirSelect.addEventListener('change', function() {
+    const dir = this.value;
+    distSelect.innerHTML = '';
+    neighborhoodGroup.style.display = 'none';
+
+    if (dir && tehranDistricts[dir]) {
+        districtGroup.style.display = 'block';
+        distSelect.innerHTML = '<option value="">همه مناطق ' + tehranDistricts[dir].label + '</option>';
+        Object.keys(tehranDistricts[dir].districts).forEach(dKey => {
+            const opt = document.createElement('option');
+            opt.value = dKey; opt.textContent = tehranDistricts[dir].districts[dKey].label;
+            distSelect.appendChild(opt);
+        });
+    } else {
+        districtGroup.style.display = 'none';
+    }
+});
+
+// District → Neighborhood cascade
+distSelect.addEventListener('change', function() {
+    const dir = dirSelect.value;
+    const dist = this.value;
+    nhSelect.innerHTML = '';
+
+    if (dir && dist && tehranDistricts[dir] && tehranDistricts[dir].districts[dist]) {
+        neighborhoodGroup.style.display = 'block';
+        nhSelect.innerHTML = '<option value="">همه محله‌ها</option>';
+        tehranDistricts[dir].districts[dist].neighborhoods.forEach(nh => {
+            const opt = document.createElement('option');
+            opt.value = nh; opt.textContent = nh;
+            nhSelect.appendChild(opt);
+        });
+    } else {
+        neighborhoodGroup.style.display = 'none';
+    }
+});
+
 // Platform card toggle
-// CRITICAL: must call e.preventDefault() to stop the <label> from also toggling the checkbox
-// (without it, the checkbox toggles TWICE: once by browser label, once by JS -> net zero change)
 document.querySelectorAll('.jf-platform-card').forEach(card => {
     card.addEventListener('click', function(e) {
-        e.preventDefault(); // Stop browser's default label-toggle behavior
+        e.preventDefault();
         const input = this.querySelector('.jf-platform-input');
         input.checked = !input.checked;
         this.classList.toggle('checked', input.checked);
@@ -239,12 +396,11 @@ document.querySelectorAll('.jf-platform-card').forEach(card => {
 
 // Category card toggle
 document.querySelectorAll('.jf-category-card').forEach(card => {
-    // Add 'suggested' class based on data attribute
     if (card.dataset.suggested === '1') {
         card.classList.add('suggested');
     }
     card.addEventListener('click', function(e) {
-        e.preventDefault(); // Stop browser's default label-toggle behavior
+        e.preventDefault();
         const input = this.querySelector('.jf-cat-input');
         input.checked = !input.checked;
         this.classList.toggle('checked', input.checked);
@@ -273,7 +429,6 @@ function deselectAllCategories() {
     updateSelectedCount();
 }
 
-// Init count
 updateSelectedCount();
 </script>
 {% endblock %}

@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/mahdi-esmaeelnezhad/crawl-py/blob/main/README.md",
+    "name": "crawl-py/README.md at main · mahdi-esmaeelnezhad  - GitHub",
+    "snippet": "A Python toolkit for crawling job listings from multiple Iranian job platforms and exporting structured data to Excel ( .xlsx ).",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/mehdikiani/jobvision_exploratory_data_analysis",
+    "name": "Exploratory Data Analysis of JobVision Recruitment Data - GitHub",
+    "snippet": "This repository contains Python codes for the Exploratory Data Analysis (EDA) of job advertisement data extracted from the JobVision website. Missing: scraper | Show results with: scraper",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/niktaakbarpour/IranITJobs2021",
+    "name": "IranITJobs2021 - GitHub",
+    "snippet": "This is a dataset containing 1300 Iranian IT job advertisements in English from August 2019 to January 2021 and collected by using a new crowdsourcing-based ... Missing: scraper | Show results with: scraper",
+    "host_name": "github.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-scraper?l=go",
+    "name": "job-scraper · GitHub Topics",
+    "snippet": "A scalable, backend-first system that scrapes real job listings, analyzes hiring trends, and serves insights through a fast API and a clean ... Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-aggregator",
+    "name": "job-aggregator · GitHub Topics",
+    "snippet": "Go-based job aggregator that scrapes and consolidates software engineering positions from 50+ tech companies (Google, Microsoft, Meta, Amazon, etc.) Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-listings-scraper?o=asc&s=stars",
+    "name": "job-listings-scraper · GitHub Topics",
+    "snippet": "Extract structured job listings from any public Greenhouse job board for easy monitoring and reporting. Transform scattered data into reusable insights. Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-scraper?o=desc&s=stars",
+    "name": "job-scraper · GitHub Topics",
+    "snippet": "An AI-powered suite to automate job scraping, resume parsing, job-to-resume scoring, and application tracking, designed to run via GitHub Actions. Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-data",
+    "name": "job-data · GitHub Topics",
+    "snippet": "The Job Crawler is an integral component of the Job RAID project, designed to automatically scrape and collect data from various job listing websites. Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/job-search",
+    "name": "job-search · GitHub Topics",
+    "snippet": "Jobs scraper library for LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter & more. Scrape job websites into a single spreadsheet with no duplicates. open- ... Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/jobsearch-automation",
+    "name": "jobsearch-automation · GitHub Topics",
+    "snippet": "A tool for scraping and clustering job postings from ch.indeed.com; Visualization is completed through various clustering and dimensionality reduction ... Missing: jobvision iran",
+    "host_name": "github.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

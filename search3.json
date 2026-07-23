@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/jd1378/iran-cities-json",
+    "name": "iran-cities-json - GitHub",
+    "snippet": "This module exports two arrays: shahrs and ostans are related by id. Usage: yarn add iran-cities-json #or npm i iran-cities-json const { shahr, ostan } = ...",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/nabidam/iran_provinces",
+    "name": "nabidam/iran_provinces: Iran provinces and their cities - GitHub",
+    "snippet": "The json file includes Iran provinces and their cities. You can use province.js as an example in you rprojects. Missing: ostan shahr",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/iran-city?l=javascript&o=desc&s=forks",
+    "name": "iran-city · GitHub Topics",
+    "snippet": "Simple relative javascript List of cities and provinces of Iran. city iran farsi iran-map iran-city. Updated on Oct 16, 2021; JavaScript ... Missing: json ostan shahr",
+    "host_name": "github.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/arashmehrani/Iran-City-List",
+    "name": "GitHub - arashmehrani/Iran-City-List: Simple relative javascript List of",
+    "snippet": "Simple relative javascript List of cities and provinces of Iran with <select>. How to use: 1- include city.js javascript file in your HTML document. Missing: json ostan shahr",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/arastu/iran",
+    "name": "arastu/iran: Administrative divisions of Iran in json and xml formats - GitHub",
+    "snippet": "List of Iran cities in json and xml format based on administrative divisions of Iran. the provinces. Each province is further subdivided into counties called ... Missing: ostan | Show results with: ostan",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/iran-city?l=php&o=desc&s=forks",
+    "name": "iran-city · GitHub Topics",
+    "snippet": "This is a complete list of countries of whole world and also Iran's provinces and cities in Laravel. iran-city topic page Missing: json ostan shahr",
+    "host_name": "github.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/topics/iran-city?l=typescript&o=desc&s=forks",
+    "name": "iran-city · GitHub Topics",
+    "snippet": "Get information about cities and provinces of Iran iran … for all cities in iran javascript open-source package city Missing: json list ostan shahr",
+    "host_name": "github.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.npmjs.com/package/iran-city",
+    "name": "iran-city - NPM",
+    "snippet": "iran-city is a package for list of cities in iran. Get all cities in Iran: Get all provinces in Iran: Get cities of a specific province",
+    "host_name": "www.npmjs.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/mhndev/iran-geography/blob/master/cities.json",
+    "name": "iran-geography/cities.json at master - GitHub",
+    "snippet": "Iran Locality persian name with Finglish name and also coordinates - iran ... Shahr\", \"province_id\": 11, \"latitude\": 32.700278, \"longitude\": 51.521111 ... Missing: javascript | Show results with: javascript",
+    "host_name": "github.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://app.unpkg.com/iran@1.0.2/files/package.json",
+    "name": "iran - UNPKG",
+    "snippet": "arastu/iran · iran / package.json. 38 lines (37 ...",
+    "host_name": "app.unpkg.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
