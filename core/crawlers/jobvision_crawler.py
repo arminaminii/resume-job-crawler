@@ -167,7 +167,8 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
     
     logger.info(f"Jobvision: keyword='{clean_kw[:60]}', city={city}, time_range={time_range}")
     
-    effective_pages = max(max_pages * 3, 10)
+    effective_pages = max_pages  # will be dynamically updated
+    _dynamic_pages = True
     
     for page in range(1, effective_pages + 1):
         try:
@@ -194,6 +195,9 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
             total_count = data.get('data', {}).get('jobPostCount', 0)
             if page == 1:
                 logger.info(f"Jobvision: {total_count} total jobs for keyword='{clean_kw[:30]}'")
+                if _dynamic_pages and total_count > 0:
+                    effective_pages = min((total_count // 30) + 3, 30)
+                    logger.info(f"Jobvision: will fetch up to {effective_pages} pages for {total_count} total")
             
             if not job_posts:
                 break
@@ -280,8 +284,7 @@ def crawl_jobvision(keywords: str = '', city: str = '', level: str = 'all',
                         f"{page_matches} matched (total: {len(results)})")
             time.sleep(0.3)
             
-            if len(results) >= max_pages * 50:
-                break
+            # No artificial result cap - fetch all available pages
             
         except requests.Timeout:
             logger.error(f"Jobvision timeout at page {page}")

@@ -291,7 +291,7 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
     
     # If no keywords, use client_filter_keywords
     if not search_kws and client_filter_keywords:
-        search_kws = [k.strip().lower() for k in client_filter_keywords[:3]]
+        search_kws = [k.strip().lower() for k in client_filter_keywords[:5]]
     
     # Determine which keyword queries to run
     if not search_kws:
@@ -300,14 +300,14 @@ def crawl_irantalent(keywords: str = '', city: str = '', level: str = 'all',
     
     # Search with each keyword separately for maximum coverage
     # But limit to top 3 keywords to avoid too many API calls
-    kw_queries = search_kws[:3]
+    kw_queries = search_kws[:5]
     
     for kw in kw_queries:
         body = {'keyword': kw, 'page': 1}
         if city and city in CITY_SLUGS:
             body['location_slugs'] = [CITY_SLUGS[city]]
         
-        for page_num in range(1, 20):  # max 20 pages per keyword
+        for page_num in range(1, max(6, max_pages) + 1):  # pages per keyword
             try:
                 page_body = dict(body)
                 page_body['page'] = page_num

@@ -22,7 +22,7 @@ from .data.provinces_cities import (
 logger = logging.getLogger(__name__)
 
 # Max seconds each crawler is allowed to run before we kill it
-CRAWLER_TIMEOUT_SECONDS = 90
+CRAWLER_TIMEOUT_SECONDS = 180
 
 
 def home(request):
@@ -378,7 +378,7 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str,
             city=jv_city,
             level=search.level,
             time_range=search.time_range,
-            max_pages=3,
+            max_pages=10,
             category_slugs=jv_query['category_slugs'],
             client_filter_keywords=category_filter_kw,
         )
@@ -396,7 +396,7 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str,
             city=ee_city,
             level=search.level,
             time_range=search.time_range,
-            max_pages=3,
+            max_pages=25,
             category_slugs=ee_query['category_slugs'],
             client_filter_keywords=category_filter_kw,
         )
@@ -414,7 +414,7 @@ def _run_search(search: JobSearch, category_filter_kw: list, auto_keywords: str,
             city=it_city,
             level=search.level,
             time_range=search.time_range,
-            max_pages=3,
+            max_pages=5,
             category_slugs=it_query['category_slugs'],
             client_filter_keywords=category_filter_kw,
         )

@@ -66,6 +66,36 @@ BENEFIT_LABELS = {
     'tourism_facility': 'تسهیلات گردشگری', 'incentive_stock': 'سهام تشویقی',
 }
 
+EN_TO_FA_KEYWORDS = {
+    'python': 'پایتون', 'java': 'جاوا', 'javascript': 'جاوااسکریپت',
+    'js': 'جاوااسکریپت', 'react': 'ری‌اکت', 'vue': 'ویو', 'angular': 'انگولار',
+    'node': 'نود', 'django': 'جانگو', 'flask': 'فلسک', 'docker': 'داکر',
+    'kubernetes': 'کوبرنیتیس', 'linux': 'لینوکس', 'aws': 'آی‌دبلیو‌اس',
+    'devops': 'دواپس', 'frontend': 'فرانت‌اند', 'backend': 'بک‌اند',
+    'fullstack': 'فول‌استک', 'mobile': 'موبایل', 'ios': 'آی‌اواس',
+    'android': 'اندروید', 'data': 'داده', 'ai': 'هوش مصنوعی',
+    'sql': 'اس‌کیوال', 'mysql': 'مای‌اس‌کیوال', 'postgresql': 'پستگرس',
+    'mongodb': 'مانگودی‌بی', 'redis': 'ردیس', 'c#': 'سی‌شارپ',
+    '.net': 'دات‌نت', 'php': 'پی‌اچ‌پی', 'laravel': 'لاراول',
+    'swift': 'سوئیفت', 'kotlin': 'کاتلین', 'go': 'گو', 'golang': 'گو',
+    'rust': 'راست', 'typescript': 'تایپ‌اسکریپت', 'html': 'اچ‌تی‌ام‌ال',
+    'css': 'سی‌اس‌اس', 'tensorflow': 'تنسورفلو', 'pytorch': 'پایتورچ',
+    'nlp': 'پردازش زبان طبیعی', 'selenium': 'سلنیوم',
+    'designer': 'طراح', 'developer': 'توسعه‌دهنده', 'programmer': 'برنامه‌نویس',
+    'engineer': 'مهندس', 'analyst': 'تحلیل‌گر', 'manager': 'مدیر',
+    'accountant': 'حسابدار', 'marketing': 'بازاریابی', 'sales': 'فروش',
+    'support': 'پشتیبانی', 'network': 'شبکه', 'security': 'امنیت',
+    'testing': 'تست', 'qa': 'تست', 'product': 'محصول', 'project': 'پروژه',
+}
+
+def _get_persian_keywords(english_kws):
+    fa = []
+    for kw in english_kws:
+        p = EN_TO_FA_KEYWORDS.get(kw.lower())
+        if p:
+            fa.append(p.lower())
+    return fa
+
 API_TIMEOUT = 25
 
 
@@ -76,9 +106,14 @@ def _get_session():
 
 
 def _calc_relevance(job_data: dict, filter_kws: list) -> float:
-    """Calculate relevance score based on keyword matches in various fields."""
+    """Calculate relevance score using expanded keywords (English + Persian)."""
     if not filter_kws:
         return 0.5
+
+    # Expand keywords with Persian equivalents, then deduplicate
+    expanded_kws = list(dict.fromkeys(
+        list(filter_kws) + _get_persian_keywords(filter_kws)
+    ))
 
     title = (job_data.get('title', '') or '').lower()
     short_title = (job_data.get('short_title', '') or '').lower()
@@ -89,7 +124,7 @@ def _calc_relevance(job_data: dict, filter_kws: list) -> float:
     benefits = [b.lower() for b in (job_data.get('benefits', []) or [])]
 
     score = 0.0
-    for kw in filter_kws:
+    for kw in expanded_kws:
         kw_l = kw.lower()
         # Title match (highest weight)
         if kw_l in title:
@@ -159,10 +194,10 @@ def crawl_estekhdam(keywords='', city='', level='all',
     logger.info(f"E-estekhdam: q='{body.get('q', '')}', city={city}, filter_kws={len(all_kws)}")
 
     # Only fetch 10 pages (200 jobs) - most won't match for IT queries
-    fetch_pages = 10
+    fetch_pages = 25
 
     # Minimum relevance score to include (skip irrelevant jobs)
-    MIN_RELEVANCE = 1.0 if all_kws else 0.0
+    MIN_RELEVANCE = 0.5 if all_kws else 0.0
 
     for page in range(1, fetch_pages + 1):
         try:
